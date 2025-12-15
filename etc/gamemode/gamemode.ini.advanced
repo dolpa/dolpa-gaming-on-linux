@@ -1,0 +1,53 @@
+# ----------------------------------------------------------------------
+# GameMode configuration – Advanced (per-user overrides)
+# ----------------------------------------------------------------------
+# Intended install location:
+#   $HOME/.config/gamemode.ini
+#
+# IMPORTANT:
+# - Some options (notably the entire [gpu] section on many builds) are
+#   considered UNSAFE and will be ignored from per-user config files.
+#   If you see errors like:
+#     "[gpu] config section is not configurable from unsafe config files"
+#   move those options to /etc/gamemode.ini.
+
+[general]
+# Check for exited clients and config reloads.
+reaper_freq=5
+
+# Use performance governor while active.
+desiredgov=performance
+
+# Scheduling policy tweak (see gamemode.ini.default for details)
+softrealtime=off
+
+# Process priority (value is negated: 10 -> nice -10)
+renice=10
+
+# I/O priority (0..7, "off" disables)
+ioprio=4
+
+# Inhibit screensaver while active
+inhibit_screensaver=1
+
+[cpu]
+# Optional: core parking/pinning (see gamemode.ini.default for details)
+#park_cores=no
+#pin_cores=yes
+
+[custom]
+# Commands run when GameMode starts and ends.
+# You can add multiple lines under start/end.
+#
+# If you want to run NVIDIA tweaks, prefer moving them to /etc/gamemode.ini
+# (system-wide) to avoid "unsafe config" restrictions on [gpu].
+#
+#start=nvidia-smi -i 0,1 -pm 1
+#start=nvidia-smi -i 0,1 -pl 250
+#start=nvidia-smi -i 0,1 -ac 7000,2100
+#start=sysctl -w kernel.sched_boost=0
+#
+#end=nvidia-smi -i 0,1 -pm 0
+#end=sysctl -w kernel.sched_boost=1
+
+script_timeout=10

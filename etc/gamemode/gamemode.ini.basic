@@ -1,0 +1,51 @@
+# =====================================================================
+# GameMode Configuration - Basic Performance Profile
+# =====================================================================
+#
+# This file is intended to be installed as a system-wide config:
+#   /etc/gamemode.ini
+#
+# Notes:
+# - GameMode's CPU governor and process priority knobs live in [general].
+# - If you previously used options like "governor=", "nice=", "class=",
+#   "priority=", etc. and saw "Config: Value ignored", those keys are not
+#   recognized by GameMode.
+
+[general]
+# The reaper thread periodically checks for exited clients.
+reaper_freq=5
+
+# CPU governor to use while GameMode is active.
+desiredgov=performance
+
+# Restore behavior: by default GameMode restores the original governor.
+# You can force a specific governor on exit by setting defaultgov.
+#defaultgov=powersave
+
+# Scheduling policy tweak (see gamemode.ini.default for details)
+softrealtime=off
+
+# Process priority (0 disables). The value is negated: 10 -> nice -10.
+renice=10
+
+# I/O priority (0 = highest priority, 7 = lowest, "off" disables)
+ioprio=4
+
+# Inhibit screensaver while GameMode is active
+inhibit_screensaver=1
+
+[gpu]
+# GPU optimisations are only applied when this is set to the keyphrase below.
+# WARNING: any damage is your responsibility.
+apply_gpu_optimisations=accept-responsibility
+
+# Uncomment if you have multiple GPUs and want a specific DRM device:
+#gpu_device=0
+
+[custom]
+# Custom scripts (executed using the shell) when gamemode starts and ends.
+#start=notify-send "GameMode started"
+#end=notify-send "GameMode ended"
+
+# Timeout for scripts (seconds).
+script_timeout=10
