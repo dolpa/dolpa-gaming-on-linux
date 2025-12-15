@@ -1,51 +1,168 @@
-# =====================================================================
-# GameMode Configuration - Basic Performance Profile
-# =====================================================================
-#
-# This file is intended to be installed as a system-wide config:
-#   /etc/gamemode.ini
-#
-# Notes:
-# - GameMode's CPU governor and process priority knobs live in [general].
-# - If you previously used options like "governor=", "nice=", "class=",
-#   "priority=", etc. and saw "Config: Value ignored", those keys are not
-#   recognized by GameMode.
+# ----------------------------------------------------------------------
+#  GameMode configuration – dual RTX‑2080 Ti + dual Xeon E5‑2699 C
+#  (no NVLink, PCI‑E 3.0 NVMe storage)
+# ----------------------------------------------------------------------
+#   • The file can live in /etc/gamemode.ini  (system‑wide) or
+#     $HOME/.config/gamemode.ini (per‑user).
+#   • All sections are optional – GameMode only applies the options it
+#     understands.
+# ----------------------------------------------------------------------
 
+# ----------------------------------------------------------------------
+#  General behaviour
+# ----------------------------------------------------------------------
 [general]
-# The reaper thread periodically checks for exited clients.
-reaper_freq=5
+# Enable the “reaper” – GameMode will keep the system in the requested
+# state for a short grace period after the last client exits.
+reaper = 1
 
-# CPU governor to use while GameMode is active.
-desiredgov=performance
+# Seconds to wait before restoring the default profile.
+reaper_timeout = 10
 
-# Restore behavior: by default GameMode restores the original governor.
-# You can force a specific governor on exit by setting defaultgov.
-#defaultgov=powersave
+# Verbosity (0‑error, 1‑warning, 2‑info, 3‑debug)
+log_level = 2
 
-# Scheduling policy tweak (see gamemode.ini.default for details)
-softrealtime=off
+# How long GameMode stays active after the client exits (seconds)
+reaper_freq = 5
 
-# Process priority (0 disables). The value is negated: 10 -> nice -10.
-renice=10
+# Print some extra debug logging (0 = off)
+verbosity = 0
 
-# I/O priority (0 = highest priority, 7 = lowest, "off" disables)
-ioprio=4
+# Soft limit for how many times a client may request GameMode
+softrealtime = off
 
-# Inhibit screensaver while GameMode is active
-inhibit_screensaver=1
 
+# ----------------------------------------------------------------------
+#  CPU – 2 × Xeon E5‑2699 C = 44 cores / 88 threads
+# ----------------------------------------------------------------------
+[cpu]
+# Force the CPU governor to “performance” while GameMode is active.
+governor = performance
+
+# Keep the entire CPU frequency range active (0‑100 %).  This prevents the
+# kernel from dropping the frequency on idle cores that might be needed
+# by the game.
+#min_perf_pct = 100  ← invalid key
+#max_perf_pct = 100  ← invalid key
+
+# Disable Intel Turbo Boost (or boost on newer kernels: "no_boost").
+# The Xeon 2699 C is already at its max spec‑rated frequency, so we keep
+# the boost disabled to avoid sudden frequency jumps that can cause
+# micro‑stutters.
+no_boost = 0
+
+# Energy‑Performance‑Preference – “performance” is the most aggressive.
+epp = performance
+
+# Pin the game to *all* logical CPUs (0‑87).  This prevents the scheduler
+# from moving the process to a CPU that is currently throttled or power‑
+# gated.
+affinity = 0-87
+
+# Give the game a higher I/O priority (nice‑level -5 for the process)
+io_priority = high
+
+# Restore previous governor afterwards
+restore_governor = on
+
+# Set realtime scheduling priority (0 = disabled)
+# Use carefully; 0 is usually best for stability
+scheduler = idle
+
+# ----------------------------------------------------------------------
+#  GPU – 2 × RTX 2080 Ti (no NVLink)
+# ----------------------------------------------------------------------
 [gpu]
-# GPU optimisations are only applied when this is set to the keyphrase below.
-# WARNING: any damage is your responsibility.
-apply_gpu_optimisations=accept-responsibility
+# Driver name – GameMode will use the appropriate CLI tools.
+driver = nvidia
 
-# Uncomment if you have multiple GPUs and want a specific DRM device:
-#gpu_device=0
+# NVIDIA / AMD GPU optimizations
+# (requires gamemode built with GPU support)
+# apply_gpu_optimisations = 0 # accept-responsibility
+#gpu_device = 0,1
 
-[custom]
-# Custom scripts (executed using the shell) when gamemode starts and ends.
-#start=notify-send "GameMode started"
-#end=notify-send "GameMode ended"
+# Enable persistence mode so the driver stays loaded and clocks don’t
+# have to be re‑initialised on every launch.
+nvidia_persistence_mode = 1
 
-# Timeout for scripts (seconds).
-script_timeout=10
+# Set a per‑GPU power limit (in watts).  250 W is the factory‑rated limit
+# for the RTX 2080 Ti.  Adjust if you run custom cooling.
+nvidia_power_limit = 250
+
+# Force the GPU into “performance” mode (equivalent to setting
+# `nvidia-smi -pm ENABLE` and `-ac` for application clocks).
+# The values are: <graphics clock MHz>,<memory clock MHz>
+#nvidia_application_clocks = 2100,7000   # 1.59 GHz graphics, 1.395 GHz memory
+
+# Keep the clocks at the highest supported frequency.
+#nvidia_gpu_clock = 2100                 # 1.71 GHz boost clock
+
+# Disable automatic fan control – let the fan curve handle it.
+nvidia_fan_control = 0
+
+# Apply the settings to both GPUs (IDs 0 and 1).
+nvidia_gpu = 0,1
+
+# Optional – disable G-SYNC/FreeSync if you run a single‑monitor setup
+# and want the lowest possible latency.
+# nvidia_sync = 0
+
+# ----------------------------------------------------------------------
+#  I/O – NVMe SSDs on PCI‑E 3.0
+# ----------------------------------------------------------------------
+[io]
+# Use the “none” (aka “mq‑none”) scheduler for NVMe – it gives the
+# lowest latency and works best with modern kernels.
+scheduler = none
+
+# Maximum number of concurrent requests per device.
+nr_requests = 256
+
+# Read‑ahead (in KiB) – 4 MiB is a good default for large, sequential game
+# assets.
+read_ahead_kb = 4096
+
+# Enable per‑device I/O statistics while GameMode is active (useful for
+# debugging).
+iostats = 1
+
+# Keep the NVMe drives in their lowest‑power‑consumption state (0 = active).
+nvme_power_state = 0
+
+# =====================================================================
+# IO Priority
+# =====================================================================
+
+[ioprio]
+# Increase I/O priority for the game
+# class: 0 = none, 1 = realtime, 2 = best-effort, 3 = idle
+class = 2
+priority = 4
+
+# =====================================================================
+# Nice Priority
+# =====================================================================
+
+[nice]
+# Lower "nice" value means higher CPU priority
+# Default is 0; -10 is a safe improvement
+nice = -10
+
+# =====================================================================
+# Scripts (Optional)
+# =====================================================================
+# Example for pre/post hooks
+# Uncomment if you want to run your own tweaks
+
+# [custom]
+# start_script = /home/you/.local/bin/game-start.sh
+# end_script   = /home/you/.local/bin/game-end.sh
+
+# =====================================================================
+# Power (Optional)
+# =====================================================================
+
+[power]
+# Disable Intel RAPL power saving during games (1 = disable)
+# Only works on CPUs supporting RAPL and only if your kernel supports it
+inhibit_rapl = 1
