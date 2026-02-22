@@ -2,11 +2,11 @@
 # -------------------------------------------------
 # Cyberpunk 2077 DLSS/FSR Benchmark on Ubuntu (Steam)
 # -------------------------------------------------
-GAME_ID=1091500         # Steam AppID for Cyberpunk 2077
-STEAM_PATH="${HOME}/.local/share/Steam"  # Main Steam installation
+GAME_ID=1091500                                     # Steam AppID for Cyberpunk 2077
+STEAM_PATH="${HOME}/.local/share/Steam"             # Main Steam installation
 STEAM_ROOT="${HOME}/.steam/root"
-CUSTOM_LIBRARY_PATH="/mnt/Data/Steam Library"  # Custom Steam library path
-PROTON_VERSION="GE-Proton9-27"  # Adjust version as needed
+CUSTOM_LIBRARY_PATH="/mnt/OldData/Steam Library"    # Custom Steam library path
+PROTON_VERSION="GE-Proton9-27"                      # Adjust version as needed
 
 # Check if Steam directory exists
 if [[ ! -d "$STEAM_PATH" ]]; then
@@ -20,7 +20,7 @@ run_bench() {
     local res=$2    # resolution, e.g., 2560x1440
     local log=$3
 
-    # Find Proton installation
+    # Find Proton installation - check Steam root and custom library possible locations
     local proton_path="$STEAM_PATH/compatibilitytools.d/$PROTON_VERSION"
     if [[ ! -d "$proton_path" ]]; then
         proton_path="$STEAM_ROOT/compatibilitytools.d/$PROTON_VERSION"
@@ -77,7 +77,7 @@ run_bench() {
         echo "Benchmark failed for $mode (exit code: $exit_code)" | tee -a "$log"
     fi
     
-    sleep 5   # give the game time to close cleanly
+    sleep 15   # give the game time to close cleanly
     return $exit_code
 }
 
