@@ -307,8 +307,8 @@
                     "name": "CrowdDensity",
                     "type": "name_list",
                     "is_dynamic": false,
-                    "value": "Low",
-                    "index": 0,
+                    "value": "Medium",
+                    "index": 1,
                     "default_index": 2,
                     "values": [
                         "Low",
@@ -626,8 +626,8 @@
                     "name": "TextureQuality",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "High",
-                    "index": 2,
+                    "value": "Medium",
+                    "index": 1,
                     "default_index": 2,
                     "values": [
                         "Low",
@@ -1644,8 +1644,8 @@
                     "name": "Anisotropy",
                     "type": "int_list",
                     "is_dynamic": false,
-                    "value": 8,
-                    "index": 2,
+                    "value": 4,
+                    "index": 1,
                     "default_index": 0,
                     "values": [
                         1,
@@ -1723,8 +1723,8 @@
                     "name": "VolumetricFogResolution",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "Low",
-                    "index": 0,
+                    "value": "Medium",
+                    "index": 1,
                     "default_index": 1,
                     "values": [
                         "Low",
@@ -1887,8 +1887,8 @@
                     "name": "CrowdDensity",
                     "type": "name_list",
                     "is_dynamic": false,
-                    "value": "Low",
-                    "index": 0,
+                    "value": "Medium",
+                    "index": 1,
                     "default_index": 2,
                     "values": [
                         "Low",
@@ -2527,7 +2527,7 @@
                 {
                     "name": "DepthOfField",
                     "type": "bool",
-                    "value": true,
+                    "value": false,
                     "default_value": true
                 },
                 {
@@ -2540,8 +2540,8 @@
                     "name": "MotionBlur",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "High",
-                    "index": 2,
+                    "value": "Low",
+                    "index": 1,
                     "default_index": 1,
                     "values": [
                         "Off",
