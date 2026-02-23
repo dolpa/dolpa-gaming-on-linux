@@ -423,6 +423,8 @@ apply_setting() {
 run_test() {
     local test_name="$1"
     local logfile="$2"
+    local test_index="${3:-0}"
+    local total_tests="${4:-0}"     # for logging purposes, if available
     
     if [[ ! "${TESTS[$test_name]+isset}" ]]; then
         echo "Error: Unknown test '$test_name'. Use --list to see available tests." >&2
@@ -436,7 +438,11 @@ run_test() {
     local ray_tracing="${params[3]}"
     local frame_generation="${params[4]}"
     
-    echo "Running test: $test_name"
+    if [[ "$test_index" -gt 0 && "$total_tests" -gt 0 ]]; then
+        echo "Running test ($test_index/$total_tests): $test_name"
+    else
+        echo "Running test: $test_name"
+    fi
     echo "Parameters: mode=$mode resolution=$resolution quality=$quality ray_tracing=$ray_tracing frame_generation=$frame_generation"
     # Apply settings and run benchmark
     if run_bench "$mode" "$resolution" "$logfile" "$quality" "$ray_tracing" "$frame_generation" "$test_name"; then
@@ -549,6 +555,7 @@ run_bench() {
 main() {
     local run_all=false
     local tests_to_run=()
+    local total_tests_count=0
 
     SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
     
@@ -635,6 +642,8 @@ main() {
         tests_to_run=("native-1080p-low-rt-off")
         echo "No tests specified, running default test: native-1080p-low-rt-off"
     fi
+
+    total_tests_count=${#tests_to_run[@]}
     
     echo "Tests to run: ${tests_to_run[*]}"
     echo "Results will be saved to: $logfile"
@@ -643,10 +652,12 @@ main() {
     # Run the selected tests
     local failed_tests=()
     local successful_tests=()
+    local current_test_index=0
     
     for test_name in "${tests_to_run[@]}"; do
+        current_test_index=$((current_test_index + 1))
         echo "======================================="
-        if run_test "$test_name" "$logfile"; then
+        if run_test "$test_name" "$logfile" "$current_test_index" "$total_tests_count"; then
             successful_tests+=("$test_name")
         else
             failed_tests+=("$test_name")
@@ -657,7 +668,7 @@ main() {
     # Summary
     echo "======================================="
     echo "Benchmark Summary:"
-    echo "Total tests run: ${#tests_to_run[@]}"
+    echo "Total tests run: ${total_tests_count}"
     echo "Successful: ${#successful_tests[@]}"
     echo "Failed: ${#failed_tests[@]}"
     echo ""
@@ -678,8 +689,10 @@ main() {
         echo ""
     fi
     
-    echo "Results saved to: $logfile"
-    echo "You can view the results with: cat \"$logfile\""
+    echo "Log file saved to: $logfile"
+    echo "Logs directory: ${SCRIPT_DIR}/logs"
+    echo "Benchmark result files saved to: ${BENCHMARK_RESULTS_OUTPUT_DIR}"
+    echo "You can view the log with: cat \"$logfile\""
     
     # Exit with error code if any tests failed
     if [[ ${#failed_tests[@]} -gt 0 ]]; then
