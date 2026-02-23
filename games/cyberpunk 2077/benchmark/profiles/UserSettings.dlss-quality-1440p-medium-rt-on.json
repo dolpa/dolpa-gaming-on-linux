@@ -654,25 +654,25 @@
                 {
                     "name": "RayTracing",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedReflections",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedSunShadows",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedLocalShadows",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
@@ -2515,19 +2515,19 @@
                 {
                     "name": "FilmGrain",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
                     "name": "ChromaticAberration",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
                     "name": "DepthOfField",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
@@ -2540,8 +2540,8 @@
                     "name": "MotionBlur",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "Low",
-                    "index": 1,
+                    "value": "High",
+                    "index": 2,
                     "default_index": 1,
                     "values": [
                         "Off",

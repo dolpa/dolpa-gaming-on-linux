@@ -307,8 +307,8 @@
                     "name": "CrowdDensity",
                     "type": "name_list",
                     "is_dynamic": false,
-                    "value": "Low",
-                    "index": 0,
+                    "value": "High",
+                    "index": 2,
                     "default_index": 2,
                     "values": [
                         "Low",
@@ -491,8 +491,8 @@
                     "name": "FSR2",
                     "type": "string_list",
                     "is_dynamic": true,
-                    "value": "Auto",
-                    "index": 0
+                    "value": "Quality",
+                    "index": 1
                 },
                 {
                     "name": "FSR2_Sharpness",
@@ -654,25 +654,25 @@
                 {
                     "name": "RayTracing",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedReflections",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedSunShadows",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedLocalShadows",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
@@ -2515,13 +2515,13 @@
                 {
                     "name": "FilmGrain",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
                     "name": "ChromaticAberration",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
