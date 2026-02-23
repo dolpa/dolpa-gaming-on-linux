@@ -448,8 +448,8 @@
                     "name": "DLSS_BackendPreset",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "Legacy",
-                    "index": 1,
+                    "value": "Transformer",
+                    "index": 0,
                     "default_index": 0,
                     "values": [
                         "Transformer",
