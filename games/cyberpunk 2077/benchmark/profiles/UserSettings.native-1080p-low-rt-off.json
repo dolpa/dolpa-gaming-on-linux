@@ -1,0 +1,33 @@
+{
+  "version": 65,
+  "data": [
+    {
+      "group_name": "/graphics/raytracing",
+      "options": [
+        {
+          "name": "RayTracing",
+          "type": "bool",
+          "value": false,
+          "default_value": false
+        }
+      ]
+    },
+    {
+      "group_name": "/controls/keybindings",
+      "options": [
+        {
+          "name": "Jump",
+          "type": "string",
+          "value": "IK_Space",
+          "default_value": "IK_Space"
+        },
+        {
+          "name": "Forward",
+          "type": "string",
+          "value": "IK_W",
+          "default_value": "IK_W"
+        }
+      ]
+    }
+  ]
+}
