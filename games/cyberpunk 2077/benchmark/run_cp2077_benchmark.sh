@@ -6,9 +6,11 @@ GAME_ID=1091500                                     # Steam AppID for Cyberpunk 
 STEAM_PATH="${HOME}/.local/share/Steam"             # Main Steam installation
 STEAM_ROOT="${HOME}/.steam/root"                    # Alternative Steam root path
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"         # Custom Steam library path
+ENABLE_MANGOHUD=1
 PROTON_VERSION="GE-Proton10-25"                      # Adjust version as needed
-USER_SETTINGS_FOLDER="${HOME}/.local/share/Steam/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"  # User settings directory
-BENCHMARK_RESULTS_SOURCE_DIR="${USER_SETTINGS_FOLDER}" # Default folder where game writes benchmark result json files
+
+USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"  # User settings directory
+BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults/" # Default folder where game writes benchmark result json files
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"    # Folder where this script stores copied per-test results
@@ -242,29 +244,17 @@ copy_benchmark_result_file() {
         return 0
     fi
 
-    local -a candidates=(
-        "$source_dir/BenchmarkResults.json"
-        "$source_dir/benchmark_results.json"
-        "$source_dir/benchmarkResults.json"
-        "$source_dir/benchmark/BenchmarkResults.json"
-        "$source_dir/benchmark/benchmark_results.json"
-    )
+    local latest_benchmark_dir
+    latest_benchmark_dir="$(find "$source_dir" -mindepth 1 -maxdepth 1 -type d -name "benchmark_*" -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
 
-    local source_file=""
-    local candidate
-    for candidate in "${candidates[@]}"; do
-        if [[ -f "$candidate" ]]; then
-            source_file="$candidate"
-            break
-        fi
-    done
-
-    if [[ -z "$source_file" ]]; then
-        source_file="$(find "$source_dir" -maxdepth 2 -type f \( -iname "*benchmark*result*.json" -o -iname "*benchmark*.json" \) -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
+    if [[ -z "$latest_benchmark_dir" || ! -d "$latest_benchmark_dir" ]]; then
+        echo "Warning: No benchmark_* directory found in $source_dir" | tee -a "$log"
+        return 0
     fi
 
-    if [[ -z "$source_file" || ! -f "$source_file" ]]; then
-        echo "Warning: No benchmark result json file found in $source_dir" | tee -a "$log"
+    local source_file="$latest_benchmark_dir/summary.json"
+    if [[ ! -f "$source_file" ]]; then
+        echo "Warning: summary.json not found in latest benchmark directory: $latest_benchmark_dir" | tee -a "$log"
         return 0
     fi
 
@@ -507,6 +497,7 @@ run_bench() {
     export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH"
 
     local -a launch_args
+
     apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
 
     # Launch the game with Proton
@@ -527,6 +518,17 @@ run_bench() {
             >>"$log" 2>&1
     
     local exit_code=$?
+    if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
+        echo "Benchmark timed out after ${BENCHMARK_TIMEOUT_SECONDS}s (mode=$mode)." | tee -a "$log"
+    fi
+
+    env \
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
+        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
+        "$proton_path/proton" run wineserver -k >>"$log" 2>&1 || true
+
+    pkill -f "Cyberpunk2077.exe|REDprelauncher.exe|CrashReporter" >/dev/null 2>&1 || true
+
     if [[ $exit_code -eq 0 ]]; then
         echo "Benchmark completed successfully for $mode" | tee -a "$log"
     else
@@ -608,8 +610,11 @@ main() {
         exit 1
     fi
     
+    # Ensure log directory exists
+    mkdir -p "${SCRIPT_DIR}/logs"
+
     # Create log file
-    local logfile="${HOME}/cyberpunk_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
+    local logfile="${SCRIPT_DIR}/logs/cyberpunk_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
     echo "Cyberpunk 2077 Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
