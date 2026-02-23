@@ -491,8 +491,8 @@
                     "name": "FSR2",
                     "type": "string_list",
                     "is_dynamic": true,
-                    "value": "Balanced",
-                    "index": 2
+                    "value": "Auto",
+                    "index": 0
                 },
                 {
                     "name": "FSR2_Sharpness",
