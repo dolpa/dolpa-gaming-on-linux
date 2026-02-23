@@ -460,8 +460,8 @@
                     "name": "DLSS",
                     "type": "string_list",
                     "is_dynamic": true,
-                    "value": "Ultra Performance",
-                    "index": 5
+                    "value": "Auto",
+                    "index": 0
                 },
                 {
                     "name": "DLSS_NewSharpness",
@@ -654,25 +654,25 @@
                 {
                     "name": "RayTracing",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedReflections",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedSunShadows",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
                     "name": "RayTracedLocalShadows",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": false
                 },
                 {
@@ -1483,8 +1483,8 @@
                     "name": "Resolution",
                     "type": "string_list",
                     "is_dynamic": true,
-                    "value": "3840x2160",
-                    "index": 20
+                    "value": "1920x1080",
+                    "index": 11
                 },
                 {
                     "name": "HDRModes",
@@ -1644,8 +1644,8 @@
                     "name": "Anisotropy",
                     "type": "int_list",
                     "is_dynamic": false,
-                    "value": 8,
-                    "index": 2,
+                    "value": 16,
+                    "index": 3,
                     "default_index": 0,
                     "values": [
                         1,
@@ -1723,8 +1723,8 @@
                     "name": "VolumetricFogResolution",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "High",
-                    "index": 2,
+                    "value": "Ultra",
+                    "index": 3,
                     "default_index": 1,
                     "values": [
                         "Low",
@@ -1737,8 +1737,8 @@
                     "name": "VolumetricCloudsQuality",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "High",
-                    "index": 2,
+                    "value": "Ultra",
+                    "index": 3,
                     "default_index": 1,
                     "values": [
                         "Off",
@@ -1751,8 +1751,8 @@
                     "name": "MaxDynamicDecals",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "High",
-                    "index": 2,
+                    "value": "Ultra",
+                    "index": 3,
                     "default_index": 1,
                     "values": [
                         "Low",
@@ -1765,8 +1765,8 @@
                     "name": "ScreenSpaceReflectionsQuality",
                     "type": "string_list",
                     "is_dynamic": false,
-                    "value": "High",
-                    "index": 3,
+                    "value": "Insane",
+                    "index": 5,
                     "default_index": 1,
                     "values": [
                         "Off",
@@ -2515,13 +2515,13 @@
                 {
                     "name": "FilmGrain",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
                     "name": "ChromaticAberration",
                     "type": "bool",
-                    "value": false,
+                    "value": true,
                     "default_value": true
                 },
                 {
