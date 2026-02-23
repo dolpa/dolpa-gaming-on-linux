@@ -8,8 +8,10 @@ STEAM_ROOT="${HOME}/.steam/root"                    # Alternative Steam root pat
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"         # Custom Steam library path
 PROTON_VERSION="GE-Proton10-25"                      # Adjust version as needed
 USER_SETTINGS_FOLDER="${HOME}/.local/share/Steam/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"  # User settings directory
+BENCHMARK_RESULTS_SOURCE_DIR="${USER_SETTINGS_FOLDER}" # Default folder where game writes benchmark result json files
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"    # Folder where this script stores copied per-test results
 
 # Define available test configurations
 declare -A TESTS
@@ -220,6 +222,56 @@ list_groups() {
     for group_name in "${!TEST_GROUPS[@]}"; do
         echo "  $group_name: ${TEST_GROUPS[$group_name]}"
     done | sort
+}
+
+copy_benchmark_result_file() {
+    local test_name="$1"
+    local log="$2"
+    local source_dir="$BENCHMARK_RESULTS_SOURCE_DIR"
+    local output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
+    local timestamp
+    timestamp="$(date +%Y%m%d_%H%M%S)"
+
+    mkdir -p "$output_dir"
+
+    if [[ ! -d "$source_dir" ]]; then
+        echo "Warning: Benchmark source directory not found: $source_dir" | tee -a "$log"
+        return 0
+    fi
+
+    local -a candidates=(
+        "$source_dir/BenchmarkResults.json"
+        "$source_dir/benchmark_results.json"
+        "$source_dir/benchmarkResults.json"
+        "$source_dir/benchmark/BenchmarkResults.json"
+        "$source_dir/benchmark/benchmark_results.json"
+    )
+
+    local source_file=""
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [[ -f "$candidate" ]]; then
+            source_file="$candidate"
+            break
+        fi
+    done
+
+    if [[ -z "$source_file" ]]; then
+        source_file="$(find "$source_dir" -maxdepth 2 -type f \( -iname "*benchmark*result*.json" -o -iname "*benchmark*.json" \) -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
+    fi
+
+    if [[ -z "$source_file" || ! -f "$source_file" ]]; then
+        echo "Warning: No benchmark result json file found in $source_dir" | tee -a "$log"
+        return 0
+    fi
+
+    local destination_file="$output_dir/result_${test_name}_${timestamp}.json"
+    cp "$source_file" "$destination_file"
+    if [[ $? -eq 0 ]]; then
+        echo "Copied benchmark result: $destination_file" | tee -a "$log"
+    else
+        echo "Warning: Failed to copy benchmark result from $source_file" | tee -a "$log"
+    fi
 }
 
 
@@ -476,6 +528,12 @@ run_bench() {
         echo "Benchmark completed successfully for $mode" | tee -a "$log"
     else
         echo "Benchmark failed for $mode (exit code: $exit_code)" | tee -a "$log"
+    fi
+
+    if [[ -n "$test_name" ]]; then
+        copy_benchmark_result_file "$test_name" "$log"
+    else
+        copy_benchmark_result_file "manual-${mode}-${res}" "$log"
     fi
     
     sleep 15   # give the game time to close cleanly
