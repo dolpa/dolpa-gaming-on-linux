@@ -143,6 +143,7 @@ show_help() {
     echo "  --list             List all available test names"
     echo "  --groups           List predefined test groups"
     echo "  --group GROUP      Run a predefined test group"
+    echo "  --validate-profiles Check whether profile files exist for tests"
     echo ""
     echo "TESTS:"
     echo "  If no test names are specified, runs default test (native-1080p-low-rt-off)"
@@ -163,6 +164,7 @@ show_help() {
     echo "  $0 --help"
     echo "  $0 --list"
     echo "  $0 --groups"
+    echo "  $0 --validate-profiles"
     echo "  $0 --all"
     echo "  $0 --group quick"
     echo "  $0 --group dlss-comparison"
@@ -176,6 +178,32 @@ show_help() {
     echo "  UserSettings.{TEST_NAME}.json"
     echo "  Example: UserSettings.fsr3-quality-4k-high-rt-off-fg.json"
     echo ""
+}
+
+validate_profiles() {
+    local missing_count=0
+
+    if [[ ! -d "${SCRIPT_DIR}/profiles" ]]; then
+        echo "Error: Profiles directory not found: ${SCRIPT_DIR}/profiles"
+        return 1
+    fi
+
+    echo "Validating profile files in ${SCRIPT_DIR}/profiles ..."
+    for test_name in "${!TESTS[@]}"; do
+        local profile_file="${SCRIPT_DIR}/profiles/UserSettings.${test_name}.json"
+        if [[ ! -f "$profile_file" ]]; then
+            echo "Missing: UserSettings.${test_name}.json"
+            missing_count=$((missing_count + 1))
+        fi
+    done
+
+    if [[ $missing_count -eq 0 ]]; then
+        echo "Profile validation passed: all test profiles exist."
+        return 0
+    fi
+
+    echo "Profile validation failed: ${missing_count} missing profile file(s)."
+    return 1
 }
 
 # Function to list available tests
@@ -223,6 +251,7 @@ apply_setting() {
     case "$mode" in
         none)
             mode="native"
+            original_mode="native"
             ;;
         native)
             ;;
@@ -277,17 +306,22 @@ apply_setting() {
     esac
     # Validate frame generation options
     case "$frame_generation" in
-        off|on|auto)
+        off|on|auto|x2|x4)
             ;;
         *)
-            echo "Error: Unsupported frame generation '$frame_generation'. Supported: off, on, auto" | tee -a "$log"
+            echo "Error: Unsupported frame generation '$frame_generation'. Supported: off, on, auto, x2, x4" | tee -a "$log"
             return 1
             ;;
     esac
     # Set launch arguments based on mode and resolution
     launch_args_ref=(--resolution "$resolution")
 
-    # Check if user settings directory exists, create if needed
+    if [[ ! -d "$profile_dir" ]]; then
+        echo "Error: Profiles directory does not exist: $profile_dir" | tee -a "$log"
+        return 1
+    fi
+
+    # Check if user settings directory exists
     if [[ ! -d "$settings_dir" ]]; then
         echo "Error: User settings directory does not exist: $settings_dir" | tee -a "$log"
         echo "Please ensure the game has been run at least once to create the settings directory." | tee -a "$log"
@@ -467,6 +501,13 @@ main() {
             --groups)
                 list_groups
                 exit 0
+                ;;
+            --validate-profiles)
+                if validate_profiles; then
+                    exit 0
+                else
+                    exit 1
+                fi
                 ;;
             --group)
                 if [[ -z "$2" ]]; then
