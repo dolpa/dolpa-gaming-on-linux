@@ -268,7 +268,7 @@ copy_benchmark_result_file() {
         return 0
     fi
 
-    local destination_file="$output_dir/result_${test_name}_${SCRIPT_RUN_TIMESTAMP}.json"
+    local destination_file="$output_dir/${GAME_ID}_result_${test_name}_${SCRIPT_RUN_TIMESTAMP}.json"
     cp "$source_file" "$destination_file"
     if [[ $? -eq 0 ]]; then
         echo "Copied benchmark result: $destination_file" | tee -a "$log"
