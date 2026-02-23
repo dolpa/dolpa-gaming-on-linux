@@ -1483,8 +1483,8 @@
                     "name": "Resolution",
                     "type": "string_list",
                     "is_dynamic": true,
-                    "value": "1920x1080",
-                    "index": 11
+                    "value": "2560x1440",
+                    "index": 16
                 },
                 {
                     "name": "HDRModes",
