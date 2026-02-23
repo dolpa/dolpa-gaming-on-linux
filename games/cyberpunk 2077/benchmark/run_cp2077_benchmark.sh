@@ -12,6 +12,7 @@ BENCHMARK_RESULTS_SOURCE_DIR="${USER_SETTINGS_FOLDER}" # Default folder where ga
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"    # Folder where this script stores copied per-test results
+SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
 
 # Define available test configurations
 declare -A TESTS
@@ -229,10 +230,12 @@ copy_benchmark_result_file() {
     local log="$2"
     local source_dir="$BENCHMARK_RESULTS_SOURCE_DIR"
     local output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
-    local timestamp
-    timestamp="$(date +%Y%m%d_%H%M%S)"
 
     mkdir -p "$output_dir"
+
+    if [[ -z "$SCRIPT_RUN_TIMESTAMP" ]]; then
+        SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+    fi
 
     if [[ ! -d "$source_dir" ]]; then
         echo "Warning: Benchmark source directory not found: $source_dir" | tee -a "$log"
@@ -265,7 +268,7 @@ copy_benchmark_result_file() {
         return 0
     fi
 
-    local destination_file="$output_dir/result_${test_name}_${timestamp}.json"
+    local destination_file="$output_dir/result_${test_name}_${SCRIPT_RUN_TIMESTAMP}.json"
     cp "$source_file" "$destination_file"
     if [[ $? -eq 0 ]]; then
         echo "Copied benchmark result: $destination_file" | tee -a "$log"
@@ -544,6 +547,8 @@ run_bench() {
 main() {
     local run_all=false
     local tests_to_run=()
+
+    SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
     
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -604,7 +609,7 @@ main() {
     fi
     
     # Create log file
-    local logfile="${HOME}/cyberpunk_benchmark_$(date +%Y%m%d_%H%M%S).txt"
+    local logfile="${HOME}/cyberpunk_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
     echo "Cyberpunk 2077 Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
