@@ -219,7 +219,7 @@ apply_setting() {
     local settings_dir="$USER_SETTINGS_FOLDER"
     local profile_dir="${SCRIPT_DIR}/profiles"
     local target_settings_file="${settings_dir}/UserSettings.json"
-
+    # Validate mode and extract base mode for profile matching
     case "$mode" in
         none)
             mode="native"
@@ -252,12 +252,12 @@ apply_setting() {
             return 1
             ;;
     esac
-
+    # Validate resolution format (e.g., 2560x1440)
     if [[ ! "$resolution" =~ ^[0-9]+x[0-9]+$ ]]; then
         echo "Error: Invalid resolution '$resolution'. Expected WIDTHxHEIGHT (e.g., 2560x1440)." | tee -a "$log"
         return 1
     fi
-
+    # Validate quality preset
     case "$quality_preset" in
         low|medium|high|ultra|custom)
             ;;
@@ -266,7 +266,7 @@ apply_setting() {
             return 1
             ;;
     esac
-
+    # Validate ray tracing options
     case "$ray_tracing" in
         off|on|psycho)
             ;;
@@ -275,7 +275,7 @@ apply_setting() {
             return 1
             ;;
     esac
-
+    # Validate frame generation options
     case "$frame_generation" in
         off|on|auto)
             ;;
@@ -284,7 +284,7 @@ apply_setting() {
             return 1
             ;;
     esac
-
+    # Set launch arguments based on mode and resolution
     launch_args_ref=(--resolution "$resolution")
 
     # Check if user settings directory exists, create if needed
@@ -304,7 +304,7 @@ apply_setting() {
         # Fallback to parameter-based naming for backward compatibility
         exact_profile="${profile_dir}/UserSettings.${original_mode}.${quality_preset}.rt-${ray_tracing}.fg-${frame_generation}.json"
     fi
-    
+    # Check if the exact profile file exists and copy it to the target settings location
     if [[ -f "$exact_profile" ]]; then
         cp "$exact_profile" "$target_settings_file"
         if [[ $? -eq 0 ]]; then
@@ -330,7 +330,7 @@ apply_setting() {
         echo "Please ensure a valid settings profile was applied or the game has been configured." | tee -a "$log"
         return 1
     fi
-
+    # Log the applied settings for reference
     echo "Applied settings => mode=$original_mode resolution=$resolution quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation" | tee -a "$log"
     if [[ -n "$test_name" ]]; then
         echo "Profile selection method: test name ($test_name)" | tee -a "$log"
@@ -359,7 +359,7 @@ run_test() {
     
     echo "Running test: $test_name"
     echo "Parameters: mode=$mode resolution=$resolution quality=$quality ray_tracing=$ray_tracing frame_generation=$frame_generation"
-    
+    # Apply settings and run benchmark
     if run_bench "$mode" "$resolution" "$logfile" "$quality" "$ray_tracing" "$frame_generation" "$test_name"; then
         echo "✓ $test_name completed successfully"
         return 0
