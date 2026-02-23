@@ -1,1 +1,5 @@
 etc/.DS_Store
+games/cyberpunk 2077/benchmark/vkd3d-proton.cache
+games/cyberpunk 2077/benchmark/vkd3d-proton.cache.write
+games/cyberpunk 2077/benchmark/logs/cyberpunk_benchmark_*_*.txt
+games/cyberpunk 2077/benchmark/results/1091500_result_*.json
