@@ -74,7 +74,7 @@ source "$TEST_GROUPS_CONFIG_FILE"
 
 augment_existing_groups_with_fg_variants() {
     for group_name in "${!TEST_GROUPS[@]}"; do
-        if [[ "$group_name" == "quick-4k" ]]; then
+        if [[ "$group_name" == "quick-4k" || "$group_name" == 4k-quick-* ]]; then
             continue
         fi
 
@@ -183,6 +183,10 @@ show_help() {
     echo "  $0 --all"
     echo "  $0 --group quick"
     echo "  $0 --group quick-4k"
+    echo "  $0 --group 4k-quick-low"
+    echo "  $0 --group 4k-quick-medium"
+    echo "  $0 --group 4k-quick-high"
+    echo "  $0 --group 4k-quick-ultra"
     echo "  $0 --group dlss-comparison"
     echo "  $0 --gamemode --group quick"
     echo "  $0 native-1080p-high-rt-off"
