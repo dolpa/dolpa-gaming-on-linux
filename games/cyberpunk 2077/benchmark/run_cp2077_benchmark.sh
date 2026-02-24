@@ -28,20 +28,36 @@ fi
 # shellcheck source=/dev/null
 source "$TESTS_CONFIG_FILE"
 
-# Auto-add Frame Generation test variants for all base tests that have matching -fg profiles.
-# This keeps TESTS in sync with profile files without manually listing hundreds of -fg entries.
+# Auto-add Frame Generation test variants for all base tests that have matching FG profiles.
+# Supported suffixes:
+#   -fg-dlss  => DLSS frame generation profile
+#   -fg-frs31 => AMD FSR 3.1 frame generation profile
+# Legacy suffix kept for compatibility:
+#   -fg
 for base_test_name in "${!TESTS[@]}"; do
-    if [[ "$base_test_name" == *-fg ]]; then
+    if [[ "$base_test_name" == *-fg* ]]; then
         continue
     fi
 
-    fg_test_name="${base_test_name}-fg"
-    fg_profile_file="${SCRIPT_DIR}/profiles/UserSettings.${fg_test_name}.json"
+    for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
+        fg_test_name="${base_test_name}-${fg_suffix}"
+        fg_profile_file="${SCRIPT_DIR}/profiles/UserSettings.${fg_test_name}.json"
 
-    if [[ -f "$fg_profile_file" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
-        read -r mode resolution quality ray_tracing frame_generation <<< "${TESTS[$base_test_name]}"
-        TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing on"
-    fi
+        if [[ -f "$fg_profile_file" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
+            read -r mode resolution quality ray_tracing frame_generation <<< "${TESTS[$base_test_name]}"
+            case "$fg_suffix" in
+                fg-dlss)
+                    TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing fg-dlss"
+                    ;;
+                fg-frs31)
+                    TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing fg-frs31"
+                    ;;
+                *)
+                    TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing on"
+                    ;;
+            esac
+        fi
+    done
 done
 
 # Predefined test groups for common scenarios
@@ -68,12 +84,15 @@ augment_existing_groups_with_fg_variants() {
                 seen_tests["$test_name"]=1
             fi
 
-            if [[ "$test_name" != *-fg ]]; then
-                local fg_variant="${test_name}-fg"
-                if [[ -n "${TESTS[$fg_variant]+isset}" && -z "${seen_tests[$fg_variant]+isset}" ]]; then
-                    updated_group_tests+=("$fg_variant")
-                    seen_tests["$fg_variant"]=1
-                fi
+            if [[ "$test_name" != *-fg* ]]; then
+                local fg_variant
+                for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
+                    fg_variant="${test_name}-${fg_suffix}"
+                    if [[ -n "${TESTS[$fg_variant]+isset}" && -z "${seen_tests[$fg_variant]+isset}" ]]; then
+                        updated_group_tests+=("$fg_variant")
+                        seen_tests["$fg_variant"]=1
+                    fi
+                done
             fi
         done
 
@@ -160,13 +179,13 @@ show_help() {
     echo "  $0 --group dlss-comparison"
     echo "  $0 native-1080p-high-rt-off"
     echo "  $0 dlss-quality-1440p-high-rt-on"
-    echo "  $0 fsr3-quality-4k-high-rt-off-fg"
-    echo "  $0 native-1440p-ultra-rt-on dlss3-quality-1440p-high-rt-on-fg"
+    echo "  $0 fsr3-quality-4k-high-rt-off-fg-dlss"
+    echo "  $0 native-1440p-ultra-rt-on dlss3-quality-1440p-high-rt-on-fg-frs31"
     echo ""
     echo "PROFILE FILES:"
     echo "  Each test expects a profile file in profiles/ directory named:"
     echo "  UserSettings.{TEST_NAME}.json"
-    echo "  Example: UserSettings.fsr3-quality-4k-high-rt-off-fg.json"
+    echo "  Example: UserSettings.fsr3-quality-4k-high-rt-off-fg-dlss.json"
     echo ""
 }
 
@@ -336,10 +355,10 @@ apply_setting() {
     esac
     # Validate frame generation options
     case "$frame_generation" in
-        off|on|auto|x2|x4)
+        off|on|auto|x2|x4|fg-dlss|fg-frs31)
             ;;
         *)
-            echo "Error: Unsupported frame generation '$frame_generation'. Supported: off, on, auto, x2, x4" | tee -a "$log"
+            echo "Error: Unsupported frame generation '$frame_generation'. Supported: off, on, auto, x2, x4, fg-dlss, fg-frs31" | tee -a "$log"
             return 1
             ;;
     esac
