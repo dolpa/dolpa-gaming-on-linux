@@ -8,10 +8,56 @@ Benchmark automation and profile management for Cyberpunk 2077 on Linux (Steam +
 	- Runs predefined benchmark test sets.
 	- Applies per-test `UserSettings.*.json` profiles.
 	- Copies benchmark output JSON into a local `results/` folder.
+- `games/cyberpunk 2077/benchmark/config/tests.conf.sh`
+	- Base test catalog (non-generated test definitions).
+- `games/cyberpunk 2077/benchmark/config/groupos.conf.sh`
+	- Base predefined groups.
 - `games/cyberpunk 2077/benchmark/profiles/`
 	- Contains one profile file per test name.
 - `games/cyberpunk 2077/benchmark/results/`
 	- Stores copied benchmark result files for each run.
+
+## Available tests and how they work
+
+Tests are built in two layers:
+
+1. Base tests from:
+	- `games/cyberpunk 2077/benchmark/config/tests.conf.sh`
+2. Auto-generated FG variants at runtime:
+	- For every base test `X`, if profile file `profiles/UserSettings.X-fg.json` exists,
+	  the script auto-adds test `X-fg` with frame generation enabled.
+
+This means `--list` shows:
+
+- All base tests from `tests.conf.sh`
+- Plus all discovered `-fg` tests that have matching profile files
+
+### Test naming convention
+
+`{mode}-{resolution}-{quality}-rt-{off|on|psycho}[-fg]`
+
+Examples:
+
+- `native-1080p-high-rt-off`
+- `dlss-quality-1440p-high-rt-on`
+- `fsr2-performance-4k-low-rt-off`
+- `native-4k-low-rt-off-fg`
+
+### Test groups
+
+Groups are also built in two layers:
+
+1. Base groups from:
+	- `games/cyberpunk 2077/benchmark/config/groupos.conf.sh`
+2. Runtime augmentation:
+	- Existing groups are expanded with matching `-fg` variants when available.
+	- Dynamic groups are auto-generated from current tests:
+		- `all-1080p-tests`
+		- `all-1440p-tests`
+		- `all-4k-tests`
+		- `all-rt-tests`
+
+So `--groups` always reflects current test coverage, including newly added profiles.
 
 ## Current benchmark flow
 
@@ -63,12 +109,16 @@ From repository root:
 	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" --help`
 - List tests:
 	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" --list`
+- List groups:
+	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" --groups`
 - Run default test:
 	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh"`
 - Run one test:
 	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" native-1080p-high-rt-off`
 - Run a group:
 	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" --group quick`
+	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" --group all-4k-tests`
+	- `"games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh" --group all-rt-tests`
 
 ## Notes
 
