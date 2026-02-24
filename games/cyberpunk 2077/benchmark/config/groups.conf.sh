@@ -8,3 +8,4 @@ TEST_GROUPS["dlss-comparison"]="dlss-quality-1440p-high-rt-off dlss-balanced-144
 TEST_GROUPS["fsr-comparison"]="fsr2-quality-1440p-high-rt-off fsr21-quality-1440p-high-rt-off fsr3-quality-1440p-high-rt-off"
 TEST_GROUPS["rt-comparison"]="native-1440p-high-rt-off native-1440p-high-rt-on dlss-quality-1440p-high-rt-on"
 TEST_GROUPS["4k-performance"]="native-4k-high-rt-off dlss-quality-4k-high-rt-off dlss-performance-4k-high-rt-off fsr3-quality-4k-high-rt-off"
+TEST_GROUPS["quick-4k"]="native-4k-high-rt-off dlss-quality-4k-high-rt-off dlss-performance-4k-high-rt-off fsr3-quality-4k-high-rt-off fsr3-performance-4k-high-rt-off dlss-quality-4k-high-rt-on"

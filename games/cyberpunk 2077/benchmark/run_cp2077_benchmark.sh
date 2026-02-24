@@ -74,6 +74,10 @@ source "$TEST_GROUPS_CONFIG_FILE"
 
 augment_existing_groups_with_fg_variants() {
     for group_name in "${!TEST_GROUPS[@]}"; do
+        if [[ "$group_name" == "quick-4k" ]]; then
+            continue
+        fi
+
         read -ra group_tests <<< "${TEST_GROUPS[$group_name]}"
 
         local -a updated_group_tests=()
