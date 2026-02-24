@@ -94,9 +94,13 @@ append_report_rows() {
 		read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$test_name]}"
 
 		if [[ "$fill_values" == "yes" ]]; then
-			local min_value="${LATEST_MIN_FPS[$test_name]:-N/A}"
-			local avg_value="${LATEST_AVG_FPS[$test_name]:-N/A}"
-			local max_value="${LATEST_MAX_FPS[$test_name]:-N/A}"
+			if [[ -z "${LATEST_MIN_FPS[$test_name]+isset}" || -z "${LATEST_AVG_FPS[$test_name]+isset}" || -z "${LATEST_MAX_FPS[$test_name]+isset}" ]]; then
+				continue
+			fi
+
+			local min_value="${LATEST_MIN_FPS[$test_name]}"
+			local avg_value="${LATEST_AVG_FPS[$test_name]}"
+			local max_value="${LATEST_MAX_FPS[$test_name]}"
 			echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} | ${min_value} | ${avg_value} | ${max_value} |" >> "$output_file"
 		else
 			echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} |  |  |  |" >> "$output_file"
@@ -148,7 +152,7 @@ write_report_header "$TEMPLATE_FILE" "Cyberpunk 2077 Benchmark Report Template" 
 total_tests="$(append_report_rows "$TEMPLATE_FILE" "no")"
 
 write_report_header "$LATEST_REPORT_FILE" "Cyberpunk 2077 Benchmark Report" "Latest result per test from JSON files"
-append_report_rows "$LATEST_REPORT_FILE" "yes" >/dev/null
+filled_rows="$(append_report_rows "$LATEST_REPORT_FILE" "yes")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
 
 filled_tests=0
@@ -163,3 +167,4 @@ echo "Generated report:   $LATEST_REPORT_FILE"
 echo "Snapshot report:    $TIMESTAMPED_REPORT_FILE"
 echo "Total test rows:    $total_tests"
 echo "Rows with FPS data: $filled_tests"
+echo "Rows in report:     $filled_rows"
