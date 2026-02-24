@@ -55,6 +55,73 @@ fi
 # shellcheck source=/dev/null
 source "$TEST_GROUPS_CONFIG_FILE"
 
+augment_existing_groups_with_fg_variants() {
+    for group_name in "${!TEST_GROUPS[@]}"; do
+        read -ra group_tests <<< "${TEST_GROUPS[$group_name]}"
+
+        local -a updated_group_tests=()
+        local -A seen_tests=()
+
+        for test_name in "${group_tests[@]}"; do
+            if [[ -n "$test_name" && -z "${seen_tests[$test_name]+isset}" ]]; then
+                updated_group_tests+=("$test_name")
+                seen_tests["$test_name"]=1
+            fi
+
+            if [[ "$test_name" != *-fg ]]; then
+                local fg_variant="${test_name}-fg"
+                if [[ -n "${TESTS[$fg_variant]+isset}" && -z "${seen_tests[$fg_variant]+isset}" ]]; then
+                    updated_group_tests+=("$fg_variant")
+                    seen_tests["$fg_variant"]=1
+                fi
+            fi
+        done
+
+        TEST_GROUPS["$group_name"]="${updated_group_tests[*]}"
+    done
+}
+
+build_dynamic_groups() {
+    local -a tests_1080p=()
+    local -a tests_1440p=()
+    local -a tests_4k=()
+    local -a tests_rt=()
+
+    for test_name in "${!TESTS[@]}"; do
+        [[ "$test_name" == *-1080p-* ]] && tests_1080p+=("$test_name")
+        [[ "$test_name" == *-1440p-* ]] && tests_1440p+=("$test_name")
+        [[ "$test_name" == *-4k-* ]] && tests_4k+=("$test_name")
+        [[ "$test_name" =~ -rt-(on|psycho) ]] && tests_rt+=("$test_name")
+    done
+
+    if [[ ${#tests_1080p[@]} -gt 0 ]]; then
+        IFS=$'\n' tests_1080p=($(sort <<<"${tests_1080p[*]}"))
+        unset IFS
+        TEST_GROUPS["all-1080p-tests"]="${tests_1080p[*]}"
+    fi
+
+    if [[ ${#tests_1440p[@]} -gt 0 ]]; then
+        IFS=$'\n' tests_1440p=($(sort <<<"${tests_1440p[*]}"))
+        unset IFS
+        TEST_GROUPS["all-1440p-tests"]="${tests_1440p[*]}"
+    fi
+
+    if [[ ${#tests_4k[@]} -gt 0 ]]; then
+        IFS=$'\n' tests_4k=($(sort <<<"${tests_4k[*]}"))
+        unset IFS
+        TEST_GROUPS["all-4k-tests"]="${tests_4k[*]}"
+    fi
+
+    if [[ ${#tests_rt[@]} -gt 0 ]]; then
+        IFS=$'\n' tests_rt=($(sort <<<"${tests_rt[*]}"))
+        unset IFS
+        TEST_GROUPS["all-rt-tests"]="${tests_rt[*]}"
+    fi
+}
+
+augment_existing_groups_with_fg_variants
+build_dynamic_groups
+
 # Function to show help
 show_help() {
     echo "Cyberpunk 2077 Benchmark Script"
