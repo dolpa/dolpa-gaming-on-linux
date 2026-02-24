@@ -3,3 +3,4 @@ games/cyberpunk 2077/benchmark/vkd3d-proton.cache
 games/cyberpunk 2077/benchmark/vkd3d-proton.cache.write
 games/cyberpunk 2077/benchmark/logs/cyberpunk_benchmark_*_*.txt
 games/cyberpunk 2077/benchmark/results/1091500_result_*.json
+games/cyberpunk 2077/benchmark/results/cp2077_benchmark_report_*_*.md
