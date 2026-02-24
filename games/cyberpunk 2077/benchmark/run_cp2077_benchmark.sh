@@ -224,6 +224,22 @@ TESTS["fsr3-quality-4k-high-rt-off-fg"]="fsr3-quality 3840x2160 high off on"
 TESTS["fsr3-balanced-1440p-high-rt-off-fg"]="fsr3-balanced 2560x1440 high off on"
 TESTS["fsr3-performance-4k-high-rt-off-fg"]="fsr3-performance 3840x2160 high off on"
 
+# Auto-add Frame Generation test variants for all base tests that have matching -fg profiles.
+# This keeps TESTS in sync with profile files without manually listing hundreds of -fg entries.
+for base_test_name in "${!TESTS[@]}"; do
+    if [[ "$base_test_name" == *-fg ]]; then
+        continue
+    fi
+
+    fg_test_name="${base_test_name}-fg"
+    fg_profile_file="${SCRIPT_DIR}/profiles/UserSettings.${fg_test_name}.json"
+
+    if [[ -f "$fg_profile_file" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
+        read -r mode resolution quality ray_tracing frame_generation <<< "${TESTS[$base_test_name]}"
+        TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing on"
+    fi
+done
+
 # Predefined test groups for common scenarios
 declare -A TEST_GROUPS
 TEST_GROUPS["quick"]="native-1080p-high-rt-off dlss-quality-1440p-high-rt-off fsr2-quality-1440p-high-rt-off"
