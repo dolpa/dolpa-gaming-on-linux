@@ -47,7 +47,7 @@ done
 # Predefined test groups for common scenarios
 declare -A TEST_GROUPS
 
-TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groupos.conf.sh"
+TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
 if [[ ! -f "$TEST_GROUPS_CONFIG_FILE" ]]; then
     echo "Error: Test groups config file not found: $TEST_GROUPS_CONFIG_FILE" >&2
     exit 1
