@@ -182,6 +182,7 @@ show_help() {
     echo "  $0 --validate-profiles"
     echo "  $0 --all"
     echo "  $0 --group quick"
+    echo "  $0 --group quick-4k"
     echo "  $0 --group dlss-comparison"
     echo "  $0 --gamemode --group quick"
     echo "  $0 native-1080p-high-rt-off"
