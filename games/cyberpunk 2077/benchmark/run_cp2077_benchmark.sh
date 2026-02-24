@@ -7,6 +7,7 @@ STEAM_PATH="${HOME}/.local/share/Steam"             # Main Steam installation
 STEAM_ROOT="${HOME}/.steam/root"                    # Alternative Steam root path
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"         # Custom Steam library path
 ENABLE_MANGOHUD=1
+ENABLE_GAMEMODERUN=0                               # 0=disabled (default), 1=prepend gamemoderun to Proton launch
 PROTON_VERSION="GE-Proton10-25"                      # Adjust version as needed
 
 USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"  # User settings directory
@@ -152,6 +153,7 @@ show_help() {
     echo "  --list             List all available test names"
     echo "  --groups           List predefined test groups"
     echo "  --group GROUP      Run a predefined test group"
+    echo "  --gamemode         Run game launch through gamemoderun"
     echo "  --validate-profiles Check whether profile files exist for tests"
     echo ""
     echo "TESTS:"
@@ -177,6 +179,7 @@ show_help() {
     echo "  $0 --all"
     echo "  $0 --group quick"
     echo "  $0 --group dlss-comparison"
+    echo "  $0 --gamemode --group quick"
     echo "  $0 native-1080p-high-rt-off"
     echo "  $0 dlss-quality-1440p-high-rt-on"
     echo "  $0 fsr3-quality-4k-high-rt-off-fg-dlss"
@@ -510,6 +513,18 @@ run_bench() {
 
     apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
 
+    local -a proton_run_cmd
+    proton_run_cmd=("$proton_path/proton")
+
+    if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
+        if command -v gamemoderun >/dev/null 2>&1; then
+            proton_run_cmd=(gamemoderun "${proton_run_cmd[@]}")
+        else
+            echo "Error: --gamemode requested but 'gamemoderun' was not found in PATH." | tee -a "$log"
+            return 1
+        fi
+    fi
+
     # Launch the game with Proton
     SteamAppId=${GAME_ID} \
     SteamGameId=${GAME_ID} \
@@ -519,7 +534,7 @@ run_bench() {
     STEAM_RUNTIME=1 \
     PROTON_LOG=1 \
     VKD3D_FEATURE_LEVEL=12_0 \
-    "$proton_path/proton" run \
+    "${proton_run_cmd[@]}" run \
     "$exe_path" \
         --launcher-skip \
         --intro-skip \
@@ -560,6 +575,7 @@ main() {
     local run_all=false
     local tests_to_run=()
     local total_tests_count=0
+    local cli_gamemode_override=false
 
     SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
     
@@ -584,6 +600,11 @@ main() {
                 else
                     exit 1
                 fi
+                ;;
+            --gamemode)
+                ENABLE_GAMEMODERUN=1
+                cli_gamemode_override=true
+                shift
                 ;;
             --group)
                 if [[ -z "$2" ]]; then
@@ -629,6 +650,15 @@ main() {
     echo "Cyberpunk 2077 Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
+    if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
+        if [[ "$cli_gamemode_override" == "true" ]]; then
+            echo "GameMode: enabled (CLI)" >>"$logfile"
+        else
+            echo "GameMode: enabled (script variable)" >>"$logfile"
+        fi
+    else
+        echo "GameMode: disabled" >>"$logfile"
+    fi
     echo "=======================================" >>"$logfile"
     
     # Determine which tests to run
