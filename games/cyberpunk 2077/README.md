@@ -112,7 +112,7 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_cp2077_results.sh`):
 
 <!-- TEST_RESULTS_START -->
-- _No reports added yet._
+
 <!-- TEST_RESULTS_END -->
 
 ## Logs and output locations
