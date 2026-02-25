@@ -10,6 +10,10 @@ TEMPLATE_FILE="${RESULTS_DIR}/cp2077_benchmark_report_template.md"
 LATEST_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report.md"
 TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
 BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
+GAME_README_FILE="${SCRIPT_DIR}/../README.md"
+TEST_RESULTS_START_MARKER="<!-- TEST_RESULTS_START -->"
+TEST_RESULTS_END_MARKER="<!-- TEST_RESULTS_END -->"
+TEST_RESULTS_PLACEHOLDER="- _No reports added yet._"
 
 if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
 	echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
@@ -263,6 +267,99 @@ append_latest_rows() {
 	echo "$rows_written"
 }
 
+ensure_test_results_section_exists() {
+	if [[ ! -f "$GAME_README_FILE" ]]; then
+		log_warning "Game README file not found, skipping report link registration: $GAME_README_FILE"
+		return 1
+	fi
+
+	if grep -Fq "$TEST_RESULTS_START_MARKER" "$GAME_README_FILE" && grep -Fq "$TEST_RESULTS_END_MARKER" "$GAME_README_FILE"; then
+		return 0
+	fi
+
+	{
+		echo
+		echo "## Test Results"
+		echo
+		echo "Latest report files:"
+		echo
+		echo "- [benchmark/results/cp2077_benchmark_report_template.md](benchmark/results/cp2077_benchmark_report_template.md)"
+		echo "- [benchmark/results/cp2077_benchmark_report.md](benchmark/results/cp2077_benchmark_report.md)"
+		echo
+		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_cp2077_results.sh\\`):"
+		echo
+		echo "$TEST_RESULTS_START_MARKER"
+		echo "$TEST_RESULTS_PLACEHOLDER"
+		echo "$TEST_RESULTS_END_MARKER"
+	} >> "$GAME_README_FILE"
+
+	log_info "Added missing Test Results section to: $GAME_README_FILE"
+	return 0
+}
+
+register_report_link_in_readme() {
+	local report_file="$1"
+
+	ensure_test_results_section_exists || return 0
+
+	local report_basename
+	report_basename="$(basename "$report_file")"
+	local relative_report_path="benchmark/results/${report_basename}"
+	local markdown_link="- [${report_basename}](${relative_report_path})"
+
+	if grep -Fq "$markdown_link" "$GAME_README_FILE"; then
+		log_info "Report link already registered in README: $report_basename"
+		return 0
+	fi
+
+	local temp_file
+	temp_file="$(mktemp)"
+
+	awk \
+		-v start_marker="$TEST_RESULTS_START_MARKER" \
+		-v end_marker="$TEST_RESULTS_END_MARKER" \
+		-v placeholder="$TEST_RESULTS_PLACEHOLDER" \
+		-v new_link="$markdown_link" \
+		'
+		$0 == start_marker {
+			print
+			print new_link
+			in_results_block = 1
+			next
+		}
+		$0 == end_marker {
+			in_results_block = 0
+		}
+		in_results_block && $0 == placeholder {
+			next
+		}
+		{
+			print
+		}
+		' "$GAME_README_FILE" > "$temp_file"
+
+	mv "$temp_file" "$GAME_README_FILE"
+	log_success "Registered report link in README: $report_basename"
+}
+
+register_all_snapshot_report_links_in_readme() {
+	ensure_test_results_section_exists || return 0
+
+	local -a snapshot_files
+	shopt -s nullglob
+	snapshot_files=("${RESULTS_DIR}"/cp2077_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
+	shopt -u nullglob
+
+	if [[ ${#snapshot_files[@]} -eq 0 ]]; then
+		return 0
+	fi
+
+	local snapshot_file
+	for snapshot_file in $(printf '%s\n' "${snapshot_files[@]}" | sort -r); do
+		register_report_link_in_readme "$snapshot_file"
+	done
+}
+
 augment_tests_with_fg_variants
 parse_arguments "$@"
 select_tests_for_report
@@ -320,6 +417,7 @@ total_tests="$(append_template_rows "$TEMPLATE_FILE")"
 write_report_header "$LATEST_REPORT_FILE" "Cyberpunk 2077 Benchmark Report" "Latest result per test from JSON files"
 filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
+register_all_snapshot_report_links_in_readme
 
 filled_tests=0
 for test_name in "${SELECTED_TESTS[@]}"; do
