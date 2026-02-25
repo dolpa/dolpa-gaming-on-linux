@@ -18,13 +18,21 @@ BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"    # Folder where this scri
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
 GPU_METADATA_TAG="unknown-gpu_unknown-vram_unknown-driver" # Set once in main and reused in result filenames
 
+BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
+if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
+    echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
+    exit 1
+fi
+# shellcheck source=/dev/null
+source "$BASH_UTILS_LOADER"
+
 # Define available test configurations
 declare -A TESTS
 
 # Load base test definitions from external config
 TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
 if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
-    echo "Error: Tests config file not found: $TESTS_CONFIG_FILE" >&2
+    log_error "Tests config file not found: $TESTS_CONFIG_FILE"
     exit 1
 fi
 # shellcheck source=/dev/null
@@ -67,7 +75,7 @@ declare -A TEST_GROUPS
 
 TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
 if [[ ! -f "$TEST_GROUPS_CONFIG_FILE" ]]; then
-    echo "Error: Test groups config file not found: $TEST_GROUPS_CONFIG_FILE" >&2
+    log_error "Test groups config file not found: $TEST_GROUPS_CONFIG_FILE"
     exit 1
 fi
 # shellcheck source=/dev/null
@@ -252,25 +260,25 @@ validate_profiles() {
     local missing_count=0
 
     if [[ ! -d "${SCRIPT_DIR}/profiles" ]]; then
-        echo "Error: Profiles directory not found: ${SCRIPT_DIR}/profiles"
+        log_error "Profiles directory not found: ${SCRIPT_DIR}/profiles"
         return 1
     fi
 
-    echo "Validating profile files in ${SCRIPT_DIR}/profiles ..."
+    log_info "Validating profile files in ${SCRIPT_DIR}/profiles ..."
     for test_name in "${!TESTS[@]}"; do
         local profile_file="${SCRIPT_DIR}/profiles/UserSettings.${test_name}.json"
         if [[ ! -f "$profile_file" ]]; then
-            echo "Missing: UserSettings.${test_name}.json"
+            log_warning "Missing: UserSettings.${test_name}.json"
             missing_count=$((missing_count + 1))
         fi
     done
 
     if [[ $missing_count -eq 0 ]]; then
-        echo "Profile validation passed: all test profiles exist."
+        log_success "Profile validation passed: all test profiles exist."
         return 0
     fi
 
-    echo "Profile validation failed: ${missing_count} missing profile file(s)."
+    log_error "Profile validation failed: ${missing_count} missing profile file(s)."
     return 1
 }
 
@@ -288,6 +296,24 @@ list_groups() {
     for group_name in "${!TEST_GROUPS[@]}"; do
         echo "  $group_name: ${TEST_GROUPS[$group_name]}"
     done | sort
+}
+
+log_to_file() {
+    local level="$1"
+    local log_file="$2"
+    shift 2
+    local message="$*"
+
+    case "$level" in
+        success) log_success "$message" ;;
+        warning) log_warning "$message" ;;
+        error) log_error "$message" ;;
+        *) log_info "$message" ;;
+    esac
+
+    if [[ -n "$log_file" ]]; then
+        printf '%s\n' "$message" >> "$log_file"
+    fi
 }
 
 sanitize_filename_segment() {
@@ -347,7 +373,7 @@ copy_benchmark_result_file() {
     fi
 
     if [[ ! -d "$source_dir" ]]; then
-        echo "Warning: Benchmark source directory not found: $source_dir" | tee -a "$log"
+        log_to_file warning "$log" "Benchmark source directory not found: $source_dir"
         return 0
     fi
 
@@ -355,22 +381,22 @@ copy_benchmark_result_file() {
     latest_benchmark_dir="$(find "$source_dir" -mindepth 1 -maxdepth 1 -type d -name "benchmark_*" -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
 
     if [[ -z "$latest_benchmark_dir" || ! -d "$latest_benchmark_dir" ]]; then
-        echo "Warning: No benchmark_* directory found in $source_dir" | tee -a "$log"
+        log_to_file warning "$log" "No benchmark_* directory found in $source_dir"
         return 0
     fi
 
     local source_file="$latest_benchmark_dir/summary.json"
     if [[ ! -f "$source_file" ]]; then
-        echo "Warning: summary.json not found in latest benchmark directory: $latest_benchmark_dir" | tee -a "$log"
+        log_to_file warning "$log" "summary.json not found in latest benchmark directory: $latest_benchmark_dir"
         return 0
     fi
 
     local destination_file="$output_dir/${GAME_ID}_result_${test_name}_${GPU_METADATA_TAG}_${SCRIPT_RUN_TIMESTAMP}.json"
     cp "$source_file" "$destination_file"
     if [[ $? -eq 0 ]]; then
-        echo "Copied benchmark result: $destination_file" | tee -a "$log"
+        log_to_file success "$log" "Copied benchmark result: $destination_file"
     else
-        echo "Warning: Failed to copy benchmark result from $source_file" | tee -a "$log"
+        log_to_file warning "$log" "Failed to copy benchmark result from $source_file"
     fi
 }
 
@@ -423,19 +449,19 @@ apply_setting() {
             # Keep original mode name for profile matching, extract base for validation
             ;;
         *)
-            echo "Error: Unsupported mode '$mode'. Supported modes:" | tee -a "$log"
-            echo "  Native: native" | tee -a "$log"
-            echo "  DLSS: dlss-quality, dlss-balanced, dlss-performance, dlss-ultra-performance" | tee -a "$log"
-            echo "  FSR 2.0: fsr2-quality, fsr2-balanced, fsr2-performance, fsr2-ultra-performance" | tee -a "$log"
-            echo "  FSR 2.1: fsr21-quality, fsr21-balanced, fsr21-performance, fsr21-ultra-performance" | tee -a "$log"
-            echo "  FSR 3.0: fsr3-quality, fsr3-balanced, fsr3-performance, fsr3-ultra-performance" | tee -a "$log"
-            echo "  XeSS: xess-quality, xess-balanced, xess-performance, xess-ultra-performance" | tee -a "$log"
+                log_to_file error "$log" "Unsupported mode '$mode'. Supported modes:"
+                log_to_file error "$log" "  Native: native"
+                log_to_file error "$log" "  DLSS: dlss-quality, dlss-balanced, dlss-performance, dlss-ultra-performance"
+                log_to_file error "$log" "  FSR 2.0: fsr2-quality, fsr2-balanced, fsr2-performance, fsr2-ultra-performance"
+                log_to_file error "$log" "  FSR 2.1: fsr21-quality, fsr21-balanced, fsr21-performance, fsr21-ultra-performance"
+                log_to_file error "$log" "  FSR 3.0: fsr3-quality, fsr3-balanced, fsr3-performance, fsr3-ultra-performance"
+                log_to_file error "$log" "  XeSS: xess-quality, xess-balanced, xess-performance, xess-ultra-performance"
             return 1
             ;;
     esac
     # Validate resolution format (e.g., 2560x1440)
     if [[ ! "$resolution" =~ ^[0-9]+x[0-9]+$ ]]; then
-        echo "Error: Invalid resolution '$resolution'. Expected WIDTHxHEIGHT (e.g., 2560x1440)." | tee -a "$log"
+        log_to_file error "$log" "Invalid resolution '$resolution'. Expected WIDTHxHEIGHT (e.g., 2560x1440)."
         return 1
     fi
     # Validate quality preset
@@ -443,7 +469,7 @@ apply_setting() {
         low|medium|high|ultra|custom)
             ;;
         *)
-            echo "Error: Unsupported quality preset '$quality_preset'. Supported: low, medium, high, ultra, custom" | tee -a "$log"
+            log_to_file error "$log" "Unsupported quality preset '$quality_preset'. Supported: low, medium, high, ultra, custom"
             return 1
             ;;
     esac
@@ -452,7 +478,7 @@ apply_setting() {
         off|on|psycho)
             ;;
         *)
-            echo "Error: Unsupported ray tracing '$ray_tracing'. Supported: off, on, psycho" | tee -a "$log"
+            log_to_file error "$log" "Unsupported ray tracing '$ray_tracing'. Supported: off, on, psycho"
             return 1
             ;;
     esac
@@ -461,7 +487,7 @@ apply_setting() {
         off|on|auto|x2|x4|fg-dlss|fg-frs31)
             ;;
         *)
-            echo "Error: Unsupported frame generation '$frame_generation'. Supported: off, on, auto, x2, x4, fg-dlss, fg-frs31" | tee -a "$log"
+            log_to_file error "$log" "Unsupported frame generation '$frame_generation'. Supported: off, on, auto, x2, x4, fg-dlss, fg-frs31"
             return 1
             ;;
     esac
@@ -469,14 +495,14 @@ apply_setting() {
     launch_args_ref=(--resolution "$resolution")
 
     if [[ ! -d "$profile_dir" ]]; then
-        echo "Error: Profiles directory does not exist: $profile_dir" | tee -a "$log"
+        log_to_file error "$log" "Profiles directory does not exist: $profile_dir"
         return 1
     fi
 
     # Check if user settings directory exists
     if [[ ! -d "$settings_dir" ]]; then
-        echo "Error: User settings directory does not exist: $settings_dir" | tee -a "$log"
-        echo "Please ensure the game has been run at least once to create the settings directory." | tee -a "$log"
+        log_to_file error "$log" "User settings directory does not exist: $settings_dir"
+        log_to_file warning "$log" "Please ensure the game has been run at least once to create the settings directory."
         return 1
     fi
 
@@ -494,34 +520,34 @@ apply_setting() {
     if [[ -f "$exact_profile" ]]; then
         cp "$exact_profile" "$target_settings_file"
         if [[ $? -eq 0 ]]; then
-            echo "Applied settings profile: $exact_profile" | tee -a "$log"
+            log_to_file success "$log" "Applied settings profile: $exact_profile"
         else
-            echo "Error: Failed to copy settings profile to $target_settings_file" | tee -a "$log"
+            log_to_file error "$log" "Failed to copy settings profile to $target_settings_file"
             return 1
         fi
     else
-        echo "Error: Required settings profile not found: $exact_profile" | tee -a "$log"
+        log_to_file error "$log" "Required settings profile not found: $exact_profile"
         if [[ -n "$test_name" ]]; then
-            echo "Expected profile file: UserSettings.${test_name}.json" | tee -a "$log"
+            log_to_file error "$log" "Expected profile file: UserSettings.${test_name}.json"
         else
-            echo "Available parameters: mode=$original_mode, quality=$quality_preset, ray_tracing=$ray_tracing, frame_generation=$frame_generation" | tee -a "$log"
+            log_to_file error "$log" "Available parameters: mode=$original_mode, quality=$quality_preset, ray_tracing=$ray_tracing, frame_generation=$frame_generation"
         fi
-        echo "Please ensure the exact profile file exists in $profile_dir" | tee -a "$log"
+        log_to_file warning "$log" "Please ensure the exact profile file exists in $profile_dir"
         return 1
     fi
 
     # Verify that UserSettings.json exists after applying settings
     if [[ ! -f "$target_settings_file" ]]; then
-        echo "Error: UserSettings.json file does not exist at $target_settings_file" | tee -a "$log"
-        echo "Please ensure a valid settings profile was applied or the game has been configured." | tee -a "$log"
+        log_to_file error "$log" "UserSettings.json file does not exist at $target_settings_file"
+        log_to_file warning "$log" "Please ensure a valid settings profile was applied or the game has been configured."
         return 1
     fi
     # Log the applied settings for reference
-    echo "Applied settings => mode=$original_mode resolution=$resolution quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation" | tee -a "$log"
+    log_to_file info "$log" "Applied settings => mode=$original_mode resolution=$resolution quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation"
     if [[ -n "$test_name" ]]; then
-        echo "Profile selection method: test name ($test_name)" | tee -a "$log"
+        log_to_file info "$log" "Profile selection method: test name ($test_name)"
     else
-        echo "Profile selection method: parameter-based" | tee -a "$log"
+        log_to_file info "$log" "Profile selection method: parameter-based"
     fi
     return 0
 }
@@ -534,7 +560,7 @@ run_test() {
     local total_tests="${4:-0}"     # for logging purposes, if available
     
     if [[ ! "${TESTS[$test_name]+isset}" ]]; then
-        echo "Error: Unknown test '$test_name'. Use --list to see available tests." >&2
+        log_to_file error "$logfile" "Unknown test '$test_name'. Use --list to see available tests."
         return 1
     fi
     
@@ -546,17 +572,17 @@ run_test() {
     local frame_generation="${params[4]}"
     
     if [[ "$test_index" -gt 0 && "$total_tests" -gt 0 ]]; then
-        echo "Running test ($test_index/$total_tests): $test_name"
+        log_to_file info "$logfile" "Running test ($test_index/$total_tests): $test_name"
     else
-        echo "Running test: $test_name"
+        log_to_file info "$logfile" "Running test: $test_name"
     fi
-    echo "Parameters: mode=$mode resolution=$resolution quality=$quality ray_tracing=$ray_tracing frame_generation=$frame_generation"
+    log_to_file info "$logfile" "Parameters: mode=$mode resolution=$resolution quality=$quality ray_tracing=$ray_tracing frame_generation=$frame_generation"
     # Apply settings and run benchmark
     if run_bench "$mode" "$resolution" "$logfile" "$quality" "$ray_tracing" "$frame_generation" "$test_name"; then
-        echo "✓ $test_name completed successfully"
+        log_to_file success "$logfile" "$test_name completed successfully"
         return 0
     else
-        echo "✗ $test_name failed"
+        log_to_file error "$logfile" "$test_name failed"
         return 1
     fi
 }
@@ -576,7 +602,7 @@ run_bench() {
     if [[ ! -d "$proton_path" ]]; then
         proton_path="$STEAM_ROOT/compatibilitytools.d/$PROTON_VERSION"
         if [[ ! -d "$proton_path" ]]; then
-            echo "Error: Proton $PROTON_VERSION not found" | tee -a "$log"
+            log_to_file error "$log" "Proton $PROTON_VERSION not found"
             return 1
         fi
     fi
@@ -588,10 +614,10 @@ run_bench() {
         if [[ ! -d "$game_path" ]]; then
             game_path="$CUSTOM_LIBRARY_PATH/steamapps/common/Cyberpunk 2077"
             if [[ ! -d "$game_path" ]]; then
-                echo "Error: Cyberpunk 2077 not found in any of these locations:" | tee -a "$log"
-                echo "  - $STEAM_PATH/steamapps/common/Cyberpunk 2077" | tee -a "$log"
-                echo "  - $STEAM_ROOT/steamapps/common/Cyberpunk 2077" | tee -a "$log"
-                echo "  - $CUSTOM_LIBRARY_PATH/steamapps/common/Cyberpunk 2077" | tee -a "$log"
+                log_to_file error "$log" "Cyberpunk 2077 not found in any of these locations:"
+                log_to_file error "$log" "  - $STEAM_PATH/steamapps/common/Cyberpunk 2077"
+                log_to_file error "$log" "  - $STEAM_ROOT/steamapps/common/Cyberpunk 2077"
+                log_to_file error "$log" "  - $CUSTOM_LIBRARY_PATH/steamapps/common/Cyberpunk 2077"
                 return 1
             fi
         fi
@@ -599,11 +625,11 @@ run_bench() {
 
     local exe_path="$game_path/bin/x64/Cyberpunk2077.exe"
     if [[ ! -f "$exe_path" ]]; then
-        echo "Error: Game executable not found at $exe_path" | tee -a "$log"
+        log_to_file error "$log" "Game executable not found at $exe_path"
         return 1
     fi
 
-    echo "=== Running mode=$mode resolution=$res quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation ===" | tee -a "$log"
+    log_to_file info "$log" "=== Running mode=$mode resolution=$res quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation ==="
     
     # Set up environment
     export STEAM_COMPAT_DATA_PATH="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
@@ -620,7 +646,7 @@ run_bench() {
         if command -v gamemoderun >/dev/null 2>&1; then
             proton_run_cmd=(gamemoderun "${proton_run_cmd[@]}")
         else
-            echo "Error: --gamemode requested but 'gamemoderun' was not found in PATH." | tee -a "$log"
+            log_to_file error "$log" "--gamemode requested but 'gamemoderun' was not found in PATH."
             return 1
         fi
     fi
@@ -644,7 +670,7 @@ run_bench() {
     
     local exit_code=$?
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
-        echo "Benchmark timed out after ${BENCHMARK_TIMEOUT_SECONDS}s (mode=$mode)." | tee -a "$log"
+        log_to_file warning "$log" "Benchmark timed out after ${BENCHMARK_TIMEOUT_SECONDS}s (mode=$mode)."
     fi
 
     env \
@@ -655,9 +681,9 @@ run_bench() {
     pkill -f "Cyberpunk2077.exe|REDprelauncher.exe|CrashReporter" >/dev/null 2>&1 || true
 
     if [[ $exit_code -eq 0 ]]; then
-        echo "Benchmark completed successfully for $mode" | tee -a "$log"
+        log_to_file success "$log" "Benchmark completed successfully for $mode"
     else
-        echo "Benchmark failed for $mode (exit code: $exit_code)" | tee -a "$log"
+        log_to_file error "$log" "Benchmark failed for $mode (exit code: $exit_code)"
     fi
 
     if [[ -n "$test_name" ]]; then
@@ -709,11 +735,11 @@ main() {
                 ;;
             --group)
                 if [[ -z "$2" ]]; then
-                    echo "Error: --group requires a group name" >&2
+                    log_error "--group requires a group name"
                     exit 1
                 fi
                 if [[ ! "${TEST_GROUPS[$2]+isset}" ]]; then
-                    echo "Error: Unknown test group '$2'. Use --groups to see available groups." >&2
+                    log_error "Unknown test group '$2'. Use --groups to see available groups."
                     exit 1
                 fi
                 # Add all tests from the group
@@ -726,8 +752,8 @@ main() {
                 shift
                 ;;
             -*)
-                echo "Error: Unknown option $1" >&2
-                echo "Use --help for usage information." >&2
+                log_error "Unknown option $1"
+                log_error "Use --help for usage information."
                 exit 1
                 ;;
             *)
@@ -739,7 +765,7 @@ main() {
     
     # Check if Steam directory exists
     if [[ ! -d "$STEAM_PATH" ]]; then
-        echo "Error: Steam directory not found at $STEAM_PATH"
+        log_error "Steam directory not found at $STEAM_PATH"
         exit 1
     fi
     
@@ -772,18 +798,17 @@ main() {
         # Sort tests for consistent order
         IFS=$'\n' tests_to_run=($(sort <<<"${tests_to_run[*]}"))
         unset IFS
-        echo "Running all available tests..."
+        log_to_file info "$logfile" "Running all available tests..."
     elif [[ ${#tests_to_run[@]} -eq 0 ]]; then
         # Default test if none specified
         tests_to_run=("native-1080p-low-rt-off")
-        echo "No tests specified, running default test: native-1080p-low-rt-off"
+        log_to_file info "$logfile" "No tests specified, running default test: native-1080p-low-rt-off"
     fi
 
     total_tests_count=${#tests_to_run[@]}
     
-    echo "Tests to run: ${tests_to_run[*]}"
-    echo "Results will be saved to: $logfile"
-    echo ""
+    log_to_file info "$logfile" "Tests to run: ${tests_to_run[*]}"
+    log_to_file info "$logfile" "Results will be saved to: $logfile"
     
     # Run the selected tests
     local failed_tests=()
@@ -792,43 +817,39 @@ main() {
     
     for test_name in "${tests_to_run[@]}"; do
         current_test_index=$((current_test_index + 1))
-        echo "======================================="
+        log_to_file info "$logfile" "======================================="
         if run_test "$test_name" "$logfile" "$current_test_index" "$total_tests_count"; then
             successful_tests+=("$test_name")
         else
             failed_tests+=("$test_name")
         fi
-        echo ""
     done
     
     # Summary
-    echo "======================================="
-    echo "Benchmark Summary:"
-    echo "Total tests run: ${total_tests_count}"
-    echo "Successful: ${#successful_tests[@]}"
-    echo "Failed: ${#failed_tests[@]}"
-    echo ""
+    log_to_file info "$logfile" "======================================="
+    log_to_file info "$logfile" "Benchmark Summary:"
+    log_to_file info "$logfile" "Total tests run: ${total_tests_count}"
+    log_to_file info "$logfile" "Successful: ${#successful_tests[@]}"
+    log_to_file info "$logfile" "Failed: ${#failed_tests[@]}"
     
     if [[ ${#successful_tests[@]} -gt 0 ]]; then
-        echo "✓ Successful tests:"
+        log_to_file success "$logfile" "Successful tests:"
         for test in "${successful_tests[@]}"; do
-            echo "  - $test"
+            log_to_file success "$logfile" "  - $test"
         done
-        echo ""
     fi
     
     if [[ ${#failed_tests[@]} -gt 0 ]]; then
-        echo "✗ Failed tests:"
+        log_to_file error "$logfile" "Failed tests:"
         for test in "${failed_tests[@]}"; do
-            echo "  - $test"
+            log_to_file error "$logfile" "  - $test"
         done
-        echo ""
     fi
     
-    echo "Log file saved to: $logfile"
-    echo "Logs directory: ${SCRIPT_DIR}/logs"
-    echo "Benchmark result files saved to: ${BENCHMARK_RESULTS_OUTPUT_DIR}"
-    echo "You can view the log with: cat \"$logfile\""
+    log_to_file info "$logfile" "Log file saved to: $logfile"
+    log_to_file info "$logfile" "Logs directory: ${SCRIPT_DIR}/logs"
+    log_to_file info "$logfile" "Benchmark result files saved to: ${BENCHMARK_RESULTS_OUTPUT_DIR}"
+    log_to_file info "$logfile" "You can view the log with: cat \"$logfile\""
     
     # Exit with error code if any tests failed
     if [[ ${#failed_tests[@]} -gt 0 ]]; then

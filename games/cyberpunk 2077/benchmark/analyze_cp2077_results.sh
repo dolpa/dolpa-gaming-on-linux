@@ -9,14 +9,23 @@ GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
 TEMPLATE_FILE="${RESULTS_DIR}/cp2077_benchmark_report_template.md"
 LATEST_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report.md"
 TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
+BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
+
+if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
+	echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
+	exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$BASH_UTILS_LOADER"
 
 if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
-	echo "Error: Tests config file not found: $TESTS_CONFIG_FILE" >&2
+	log_error "Tests config file not found: $TESTS_CONFIG_FILE"
 	exit 1
 fi
 
 if [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
-	echo "Error: Test groups config file not found: $GROUPS_CONFIG_FILE" >&2
+	log_error "Test groups config file not found: $GROUPS_CONFIG_FILE"
 	exit 1
 fi
 
@@ -84,15 +93,15 @@ parse_arguments() {
 				;;
 			--group)
 				if [[ -z "${2:-}" ]]; then
-					echo "Error: --group requires a group name" >&2
+					log_error "--group requires a group name"
 					exit 1
 				fi
 				REQUESTED_GROUPS+=("$2")
 				shift 2
 				;;
 			-*)
-				echo "Error: Unknown option $1" >&2
-				echo "Use --help for usage information." >&2
+				log_error "Unknown option $1"
+				log_error "Use --help for usage information."
 				exit 1
 				;;
 			*)
@@ -113,14 +122,14 @@ select_tests_for_report() {
 
 	for group_name in "${REQUESTED_GROUPS[@]}"; do
 		if [[ -z "${TEST_GROUPS[$group_name]+isset}" ]]; then
-			echo "Error: Unknown test group '$group_name'. Use --list-groups to inspect available groups." >&2
+			log_error "Unknown test group '$group_name'. Use --list-groups to inspect available groups."
 			exit 1
 		fi
 
 		read -ra group_tests <<<"${TEST_GROUPS[$group_name]}"
 		for test_name in "${group_tests[@]}"; do
 			if [[ -z "${TESTS[$test_name]+isset}" ]]; then
-				echo "Error: Group '$group_name' references unknown test '$test_name'." >&2
+				log_error "Group '$group_name' references unknown test '$test_name'."
 				exit 1
 			fi
 			if [[ -z "${seen[$test_name]+isset}" ]]; then
@@ -132,7 +141,7 @@ select_tests_for_report() {
 
 	for test_name in "${REQUESTED_TESTS[@]}"; do
 		if [[ -z "${TESTS[$test_name]+isset}" ]]; then
-			echo "Error: Unknown test '$test_name'. Use --list-tests to inspect available tests." >&2
+			log_error "Unknown test '$test_name'. Use --list-tests to inspect available tests."
 			exit 1
 		fi
 		if [[ -z "${seen[$test_name]+isset}" ]]; then
@@ -142,7 +151,7 @@ select_tests_for_report() {
 	done
 
 	if [[ ${#SELECTED_TESTS[@]} -eq 0 ]]; then
-		echo "Error: No tests selected for reporting." >&2
+		log_error "No tests selected for reporting."
 		exit 1
 	fi
 }
@@ -319,10 +328,10 @@ for test_name in "${SELECTED_TESTS[@]}"; do
 	fi
 done
 
-echo "Generated template: $TEMPLATE_FILE"
-echo "Generated report:   $LATEST_REPORT_FILE"
-echo "Snapshot report:    $TIMESTAMPED_REPORT_FILE"
-echo "Total test rows:    $total_tests"
-echo "Rows with FPS data: $filled_tests"
-echo "Rows in report:     $filled_rows"
-echo "Selected tests:     ${#SELECTED_TESTS[@]}"
+log_success "Generated template: $TEMPLATE_FILE"
+log_success "Generated report:   $LATEST_REPORT_FILE"
+log_success "Snapshot report:    $TIMESTAMPED_REPORT_FILE"
+log_info "Total test rows:    $total_tests"
+log_info "Rows with FPS data: $filled_tests"
+log_info "Rows in report:     $filled_rows"
+log_info "Selected tests:     ${#SELECTED_TESTS[@]}"
