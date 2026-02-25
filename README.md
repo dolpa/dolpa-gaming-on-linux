@@ -16,7 +16,7 @@ Automation and documentation for game benchmarking workflows on Linux.
 ## Game manuals
 
 - Cyberpunk 2077 benchmark manual:
-	- `games/cyberpunk 2077/README.md`
+	- [games/cyberpunk 2077/README.md](games/cyberpunk%202077/README.md)
 
 This includes usage, test/group behavior, profile requirements, result/report formats, and troubleshooting notes for Cyberpunk 2077.
 
