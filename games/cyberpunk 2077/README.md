@@ -112,6 +112,8 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_cp2077_results.sh`):
 
 <!-- TEST_RESULTS_START -->
+- [cp2077_benchmark_report_20260225_222442.md](benchmark/results/cp2077_benchmark_report_20260225_222442.md) - from RTX 5060 8GB
+
 
 <!-- TEST_RESULTS_END -->
 
