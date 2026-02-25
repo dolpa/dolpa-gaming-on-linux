@@ -102,6 +102,19 @@ Analyzer supports both filename styles:
 - New GPU-aware filenames (preferred)
 - Legacy filenames without GPU fields (reported as `unknown-*`)
 
+## Test Results
+
+Latest report files:
+
+- [benchmark/results/cp2077_benchmark_report_template.md](benchmark/results/cp2077_benchmark_report_template.md)
+- [benchmark/results/cp2077_benchmark_report.md](benchmark/results/cp2077_benchmark_report.md)
+
+Historical snapshot reports (auto-updated by `benchmark/analyze_cp2077_results.sh`):
+
+<!-- TEST_RESULTS_START -->
+- _No reports added yet._
+<!-- TEST_RESULTS_END -->
+
 ## Logs and output locations
 
 At the end of a run, the script prints:
