@@ -9,6 +9,9 @@ CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"         # Custom Steam library path
 ENABLE_MANGOHUD=1
 ENABLE_GAMEMODERUN=0                               # 0=disabled (default), 1=prepend gamemoderun to Proton launch
 PROTON_VERSION="GE-Proton10-25"                      # Adjust version as needed
+BENCHMARK_TIMEOUT_MINUTES=15                        # Per-test timeout in minutes
+BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
+BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30             # Grace period before SIGKILL after timeout
 
 USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"  # User settings directory
 BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults/" # Default folder where game writes benchmark result json files
@@ -240,6 +243,7 @@ show_help() {
     echo "  --list             List all available test names"
     echo "  --groups           List predefined test groups"
     echo "  --group GROUP      Run a predefined test group"
+    echo "  --timeout-minutes  MIN  Per-test timeout in minutes (default: 15)"
     echo "  --gamemode         Run game launch through gamemoderun"
     echo "  --validate-profiles Check whether profile files exist for tests"
     echo ""
@@ -688,21 +692,28 @@ run_bench() {
     fi
 
     # Launch the game with Proton
-    SteamAppId=${GAME_ID} \
-    SteamGameId=${GAME_ID} \
-    PROTON_VERB="waitforexitandrun" \
-    STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH" \
-    STEAM_COMPAT_DATA_PATH="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
-    STEAM_RUNTIME=1 \
-    PROTON_LOG=1 \
-    VKD3D_FEATURE_LEVEL=12_0 \
-    "${proton_run_cmd[@]}" run \
-    "$exe_path" \
+    if ! command -v timeout >/dev/null 2>&1; then
+        log_to_file error "$log" "Required command 'timeout' not found. Please install coreutils."
+        return 1
+    fi
+
+    timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s" \
+        env \
+        "SteamAppId=${GAME_ID}" \
+        "SteamGameId=${GAME_ID}" \
+        "PROTON_VERB=waitforexitandrun" \
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
+        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
+        "STEAM_RUNTIME=1" \
+        "PROTON_LOG=1" \
+        "VKD3D_FEATURE_LEVEL=12_0" \
+        "${proton_run_cmd[@]}" run \
+        "$exe_path" \
         --launcher-skip \
         --intro-skip \
         "${launch_args[@]}" \
-        -benchmark
-            >>"$log" 2>&1
+        -benchmark \
+        >>"$log" 2>&1
     
     local exit_code=$?
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
@@ -783,6 +794,15 @@ main() {
                 tests_to_run+=("${group_tests[@]}")
                 shift 2
                 ;;
+            --timeout-minutes)
+                if [[ -z "${2:-}" || ! "$2" =~ ^[0-9]+$ || "$2" -le 0 ]]; then
+                    log_error "--timeout-minutes requires a positive integer value"
+                    exit 1
+                fi
+                BENCHMARK_TIMEOUT_MINUTES="$2"
+                BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
+                shift 2
+                ;;
             --all)
                 run_all=true
                 shift
@@ -814,6 +834,7 @@ main() {
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
     echo "GPU Metadata: $GPU_METADATA_TAG" >>"$logfile"
+    echo "Per-test timeout: ${BENCHMARK_TIMEOUT_MINUTES} minute(s) (${BENCHMARK_TIMEOUT_SECONDS}s)" >>"$logfile"
     if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
         if [[ "$cli_gamemode_override" == "true" ]]; then
             echo "GameMode: enabled (CLI)" >>"$logfile"
