@@ -208,10 +208,56 @@ except Exception:
 PY
 }
 
+join_unique_values() {
+	if [[ $# -eq 0 ]]; then
+		echo "N/A"
+		return
+	fi
+
+	printf '%s\n' "$@" \
+		| awk 'NF' \
+		| sort -u \
+		| awk 'BEGIN { first = 1 } { if (!first) printf ", "; printf "%s", $0; first = 0 } END { if (NR == 0) printf "N/A"; printf "\n" }'
+}
+
+collect_selected_gpu_metadata() {
+	local -A selected_tests_lookup=()
+	local -A gpu_models=()
+	local -A gpu_vrams=()
+	local -A gpu_drivers=()
+	local key key_test gpu_model gpu_vram gpu_driver
+
+	for test_name in "${SELECTED_TESTS[@]}"; do
+		selected_tests_lookup["$test_name"]=1
+	done
+
+	for key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+		if [[ -z "${selected_tests_lookup[${key%%|*}]+isset}" ]]; then
+			continue
+		fi
+
+		if [[ -z "${LATEST_MIN_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_AVG_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_MAX_FPS_BY_KEY[$key]+isset}" ]]; then
+			continue
+		fi
+
+		IFS='|' read -r key_test gpu_model gpu_vram gpu_driver <<<"$key"
+		gpu_models["$gpu_model"]=1
+		gpu_vrams["$gpu_vram"]=1
+		gpu_drivers["$gpu_driver"]=1
+	done
+
+	REPORT_GPU_MODELS="$(join_unique_values "${!gpu_models[@]}")"
+	REPORT_GPU_VRAMS="$(join_unique_values "${!gpu_vrams[@]}")"
+	REPORT_GPU_DRIVERS="$(join_unique_values "${!gpu_drivers[@]}")"
+}
+
 write_report_header() {
 	local output_file="$1"
 	local title="$2"
 	local mode_label="$3"
+	local gpu_models="$4"
+	local gpu_vrams="$5"
+	local gpu_drivers="$6"
 
 	{
 		echo "# ${title}"
@@ -219,6 +265,9 @@ write_report_header() {
 		echo "- Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 		echo "- Source directory: ${RESULTS_DIR}"
 		echo "- Mode: ${mode_label}"
+		echo "- GPU model(s): ${gpu_models}"
+		echo "- GPU VRAM: ${gpu_vrams}"
+		echo "- GPU driver(s): ${gpu_drivers}"
 		echo
 		echo "| Test Name | Mode | Resolution | Quality | Ray Tracing | Frame Generation | GPU Model | GPU VRAM | Driver | Min FPS | Avg FPS | Max FPS |"
 		echo "|---|---|---|---|---|---|---|---|---|---:|---:|---:|"
@@ -411,10 +460,15 @@ for result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
 	fi
 done
 
-write_report_header "$TEMPLATE_FILE" "Cyberpunk 2077 Benchmark Report Template" "Template (blank FPS cells)"
+REPORT_GPU_MODELS="N/A"
+REPORT_GPU_VRAMS="N/A"
+REPORT_GPU_DRIVERS="N/A"
+collect_selected_gpu_metadata
+
+write_report_header "$TEMPLATE_FILE" "Cyberpunk 2077 Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 total_tests="$(append_template_rows "$TEMPLATE_FILE")"
 
-write_report_header "$LATEST_REPORT_FILE" "Cyberpunk 2077 Benchmark Report" "Latest result per test from JSON files"
+write_report_header "$LATEST_REPORT_FILE" "Cyberpunk 2077 Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
 register_all_snapshot_report_links_in_readme
