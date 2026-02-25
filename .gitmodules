@@ -1,0 +1,3 @@
+[submodule "dolpa-bash-utils"]
+	path = dolpa-bash-utils
+	url = https://github.com/dolpa/dolpa-bash-utils.git
