@@ -72,6 +72,43 @@ fi
 # shellcheck source=/dev/null
 source "$TEST_GROUPS_CONFIG_FILE"
 
+build_quick_resolution_variant_groups() {
+    local source_group_name
+    for source_group_name in "${!TEST_GROUPS[@]}"; do
+        [[ "$source_group_name" == 4k-quick-* ]] || continue
+
+        local group_suffix="${source_group_name#4k-quick-}"
+        local target_group_1080p="1080p-quick-${group_suffix}"
+        local target_group_1440p="1440p-quick-${group_suffix}"
+
+        read -ra source_tests <<< "${TEST_GROUPS[$source_group_name]}"
+
+        local -a mapped_1080p_tests=()
+        local -a mapped_1440p_tests=()
+        local source_test mapped_test
+
+        for source_test in "${source_tests[@]}"; do
+            mapped_test="${source_test//-4k-/-1080p-}"
+            if [[ -n "${TESTS[$mapped_test]+isset}" ]]; then
+                mapped_1080p_tests+=("$mapped_test")
+            fi
+
+            mapped_test="${source_test//-4k-/-1440p-}"
+            if [[ -n "${TESTS[$mapped_test]+isset}" ]]; then
+                mapped_1440p_tests+=("$mapped_test")
+            fi
+        done
+
+        if [[ ${#mapped_1080p_tests[@]} -gt 0 ]]; then
+            TEST_GROUPS["$target_group_1080p"]="${mapped_1080p_tests[*]}"
+        fi
+
+        if [[ ${#mapped_1440p_tests[@]} -gt 0 ]]; then
+            TEST_GROUPS["$target_group_1440p"]="${mapped_1440p_tests[*]}"
+        fi
+    done
+}
+
 augment_existing_groups_with_fg_variants() {
     for group_name in "${!TEST_GROUPS[@]}"; do
         if [[ "$group_name" == "quick-4k" || "$group_name" == 4k-quick-* ]]; then
@@ -144,6 +181,7 @@ build_dynamic_groups() {
 }
 
 augment_existing_groups_with_fg_variants
+build_quick_resolution_variant_groups
 build_dynamic_groups
 
 # Function to show help
@@ -187,6 +225,14 @@ show_help() {
     echo "  $0 --group 4k-quick-medium"
     echo "  $0 --group 4k-quick-high"
     echo "  $0 --group 4k-quick-ultra"
+    echo "  $0 --group 1080p-quick-low"
+    echo "  $0 --group 1080p-quick-medium"
+    echo "  $0 --group 1080p-quick-high"
+    echo "  $0 --group 1080p-quick-ultra"
+    echo "  $0 --group 1440p-quick-low"
+    echo "  $0 --group 1440p-quick-medium"
+    echo "  $0 --group 1440p-quick-high"
+    echo "  $0 --group 1440p-quick-ultra"
     echo "  $0 --group dlss-comparison"
     echo "  $0 --gamemode --group quick"
     echo "  $0 native-1080p-high-rt-off"
