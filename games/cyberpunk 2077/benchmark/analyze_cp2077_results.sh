@@ -409,7 +409,81 @@ register_all_snapshot_report_links_in_readme() {
 	done
 }
 
+build_quick_resolution_variant_groups() {
+	add_test_and_rt_pair_if_available() {
+		local target_array_name="$1"
+		local mapped_test_name="$2"
+
+		if [[ -z "${TESTS[$mapped_test_name]+isset}" ]]; then
+			return
+		fi
+
+		eval "$target_array_name+=(\"$mapped_test_name\")"
+
+		local counterpart_test_name=""
+		if [[ "$mapped_test_name" == *-rt-off* ]]; then
+			counterpart_test_name="${mapped_test_name/-rt-off/-rt-on}"
+		elif [[ "$mapped_test_name" == *-rt-on* ]]; then
+			counterpart_test_name="${mapped_test_name/-rt-on/-rt-off}"
+		fi
+
+		if [[ -n "$counterpart_test_name" && -n "${TESTS[$counterpart_test_name]+isset}" ]]; then
+			eval "$target_array_name+=(\"$counterpart_test_name\")"
+		fi
+	}
+
+	local source_group_name
+	for source_group_name in "${!TEST_GROUPS[@]}"; do
+		[[ "$source_group_name" == 4k-quick-* ]] || continue
+
+		local group_suffix="${source_group_name#4k-quick-}"
+		local target_group_1080p="1080p-quick-${group_suffix}"
+		local target_group_1440p="1440p-quick-${group_suffix}"
+
+		read -ra source_tests <<<"${TEST_GROUPS[$source_group_name]}"
+
+		local -a mapped_1080p_tests=()
+		local -a mapped_1440p_tests=()
+		local -A seen_1080p_tests=()
+		local -A seen_1440p_tests=()
+		local source_test mapped_test
+
+		for source_test in "${source_tests[@]}"; do
+			mapped_test="${source_test//-4k-/-1080p-}"
+			add_test_and_rt_pair_if_available "mapped_1080p_tests" "$mapped_test"
+
+			mapped_test="${source_test//-4k-/-1440p-}"
+			add_test_and_rt_pair_if_available "mapped_1440p_tests" "$mapped_test"
+		done
+
+		local -a deduped_1080p_tests=()
+		for mapped_test in "${mapped_1080p_tests[@]}"; do
+			if [[ -z "${seen_1080p_tests[$mapped_test]+isset}" ]]; then
+				deduped_1080p_tests+=("$mapped_test")
+				seen_1080p_tests["$mapped_test"]=1
+			fi
+		done
+
+		local -a deduped_1440p_tests=()
+		for mapped_test in "${mapped_1440p_tests[@]}"; do
+			if [[ -z "${seen_1440p_tests[$mapped_test]+isset}" ]]; then
+				deduped_1440p_tests+=("$mapped_test")
+				seen_1440p_tests["$mapped_test"]=1
+			fi
+		done
+
+		if [[ ${#deduped_1080p_tests[@]} -gt 0 ]]; then
+			TEST_GROUPS["$target_group_1080p"]="${deduped_1080p_tests[*]}"
+		fi
+
+		if [[ ${#deduped_1440p_tests[@]} -gt 0 ]]; then
+			TEST_GROUPS["$target_group_1440p"]="${deduped_1440p_tests[*]}"
+		fi
+	done
+}
+
 augment_tests_with_fg_variants
+build_quick_resolution_variant_groups
 parse_arguments "$@"
 select_tests_for_report
 
