@@ -16,6 +16,7 @@ BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"    # Folder where this script stores copied per-test results
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
+GPU_METADATA_TAG="unknown-gpu_unknown-vram_unknown-driver" # Set once in main and reused in result filenames
 
 # Define available test configurations
 declare -A TESTS
@@ -289,6 +290,50 @@ list_groups() {
     done | sort
 }
 
+sanitize_filename_segment() {
+    local value="$1"
+    value="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
+    value="$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    value="$(echo "$value" | sed 's/[[:space:]]\+/_/g')"
+    value="$(echo "$value" | sed 's/[^a-z0-9._-]/-/g')"
+    value="$(echo "$value" | sed 's/[-_][-_]*/-/g')"
+    value="$(echo "$value" | sed 's/^[-_.]*//;s/[-_.]*$//')"
+    if [[ -z "$value" ]]; then
+        value="unknown"
+    fi
+    echo "$value"
+}
+
+detect_gpu_metadata() {
+    local gpu_model="unknown-gpu"
+    local gpu_vram="unknown-vram"
+    local gpu_driver="unknown-driver"
+
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        local gpu_line
+        gpu_line="$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits 2>/dev/null | head -n1)"
+        if [[ -n "$gpu_line" ]]; then
+            local model_raw vram_raw driver_raw
+            IFS=',' read -r model_raw vram_raw driver_raw <<< "$gpu_line"
+            model_raw="$(echo "$model_raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            vram_raw="$(echo "$vram_raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            driver_raw="$(echo "$driver_raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+            [[ -n "$model_raw" ]] && gpu_model="$model_raw"
+            [[ -n "$vram_raw" ]] && gpu_vram="${vram_raw}mb"
+            [[ -n "$driver_raw" ]] && gpu_driver="$driver_raw"
+        fi
+    elif command -v lspci >/dev/null 2>&1; then
+        local lspci_line
+        lspci_line="$(lspci 2>/dev/null | grep -Ei 'vga|3d|display' | head -n1)"
+        if [[ -n "$lspci_line" ]]; then
+            gpu_model="$lspci_line"
+        fi
+    fi
+
+    GPU_METADATA_TAG="$(sanitize_filename_segment "$gpu_model")_$(sanitize_filename_segment "$gpu_vram")_$(sanitize_filename_segment "$gpu_driver")"
+}
+
 copy_benchmark_result_file() {
     local test_name="$1"
     local log="$2"
@@ -320,7 +365,7 @@ copy_benchmark_result_file() {
         return 0
     fi
 
-    local destination_file="$output_dir/${GAME_ID}_result_${test_name}_${SCRIPT_RUN_TIMESTAMP}.json"
+    local destination_file="$output_dir/${GAME_ID}_result_${test_name}_${GPU_METADATA_TAG}_${SCRIPT_RUN_TIMESTAMP}.json"
     cp "$source_file" "$destination_file"
     if [[ $? -eq 0 ]]; then
         echo "Copied benchmark result: $destination_file" | tee -a "$log"
@@ -633,6 +678,7 @@ main() {
     local cli_gamemode_override=false
 
     SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+    detect_gpu_metadata
     
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
@@ -705,6 +751,7 @@ main() {
     echo "Cyberpunk 2077 Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
+    echo "GPU Metadata: $GPU_METADATA_TAG" >>"$logfile"
     if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
         if [[ "$cli_gamemode_override" == "true" ]]; then
             echo "GameMode: enabled (CLI)" >>"$logfile"

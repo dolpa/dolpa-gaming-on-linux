@@ -207,47 +207,62 @@ write_report_header() {
 		echo "- Source directory: ${RESULTS_DIR}"
 		echo "- Mode: ${mode_label}"
 		echo
-		echo "| Test Name | Mode | Resolution | Quality | Ray Tracing | Frame Generation | Min FPS | Avg FPS | Max FPS |"
-		echo "|---|---|---|---|---|---|---:|---:|---:|"
+		echo "| Test Name | Mode | Resolution | Quality | Ray Tracing | Frame Generation | GPU Model | GPU VRAM | Driver | Min FPS | Avg FPS | Max FPS |"
+		echo "|---|---|---|---|---|---|---|---|---|---:|---:|---:|"
 	} > "$output_file"
 }
 
-append_report_rows() {
+append_template_rows() {
 	local output_file="$1"
-	local fill_values="$2"
 	local tests_written=0
 
 	for test_name in "${SELECTED_TESTS[@]}"; do
 		read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$test_name]}"
-
-		if [[ "$fill_values" == "yes" ]]; then
-			if [[ -z "${LATEST_MIN_FPS[$test_name]+isset}" || -z "${LATEST_AVG_FPS[$test_name]+isset}" || -z "${LATEST_MAX_FPS[$test_name]+isset}" ]]; then
-				continue
-			fi
-
-			local min_value="${LATEST_MIN_FPS[$test_name]}"
-			local avg_value="${LATEST_AVG_FPS[$test_name]}"
-			local max_value="${LATEST_MAX_FPS[$test_name]}"
-			echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} | ${min_value} | ${avg_value} | ${max_value} |" >> "$output_file"
-		else
-			echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} |  |  |  |" >> "$output_file"
-		fi
-
+		echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} |  |  |  |  |  |  |" >> "$output_file"
 		tests_written=$((tests_written + 1))
 	done
 
 	echo "$tests_written"
 }
 
+append_latest_rows() {
+	local output_file="$1"
+	local rows_written=0
+	local key test_name mode resolution quality ray_tracing frame_generation
+	local key_test gpu_model gpu_vram gpu_driver
+
+	mapfile -t sorted_keys < <(printf '%s\n' "${!LATEST_RESULT_FILE_BY_KEY[@]}" | sort)
+
+	for test_name in "${SELECTED_TESTS[@]}"; do
+		read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$test_name]}"
+
+		for key in "${sorted_keys[@]}"; do
+			IFS='|' read -r key_test gpu_model gpu_vram gpu_driver <<<"$key"
+			if [[ "$key_test" != "$test_name" ]]; then
+				continue
+			fi
+
+			if [[ -z "${LATEST_MIN_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_AVG_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_MAX_FPS_BY_KEY[$key]+isset}" ]]; then
+				continue
+			fi
+
+			echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} | ${gpu_model} | ${gpu_vram} | ${gpu_driver} | ${LATEST_MIN_FPS_BY_KEY[$key]} | ${LATEST_AVG_FPS_BY_KEY[$key]} | ${LATEST_MAX_FPS_BY_KEY[$key]} |" >> "$output_file"
+			rows_written=$((rows_written + 1))
+		done
+	done
+
+	echo "$rows_written"
+}
+
 augment_tests_with_fg_variants
 parse_arguments "$@"
 select_tests_for_report
 
-declare -A LATEST_RESULT_FILE
-declare -A LATEST_TIMESTAMP
-declare -A LATEST_MIN_FPS
-declare -A LATEST_AVG_FPS
-declare -A LATEST_MAX_FPS
+declare -A LATEST_RESULT_FILE_BY_KEY
+declare -A LATEST_TIMESTAMP_BY_KEY
+declare -A LATEST_MIN_FPS_BY_KEY
+declare -A LATEST_AVG_FPS_BY_KEY
+declare -A LATEST_MAX_FPS_BY_KEY
 
 shopt -s nullglob
 result_files=("${RESULTS_DIR}"/*_result_*.json)
@@ -255,38 +270,51 @@ shopt -u nullglob
 
 for result_file in "${result_files[@]}"; do
 	file_name="$(basename "$result_file")"
-	if [[ "$file_name" =~ ^[0-9]+_result_(.+)_([0-9]{8}_[0-9]{6})\.json$ ]]; then
+	if [[ "$file_name" =~ ^[0-9]+_result_(.+)_([^_]+)_([^_]+)_([^_]+)_([0-9]{8}_[0-9]{6})\.json$ ]]; then
+		test_name="${BASH_REMATCH[1]}"
+		gpu_model="${BASH_REMATCH[2]}"
+		gpu_vram="${BASH_REMATCH[3]}"
+		gpu_driver="${BASH_REMATCH[4]}"
+		result_timestamp="${BASH_REMATCH[5]}"
+		result_key="${test_name}|${gpu_model}|${gpu_vram}|${gpu_driver}"
+
+		if [[ -z "${LATEST_TIMESTAMP_BY_KEY[$result_key]+isset}" || "$result_timestamp" > "${LATEST_TIMESTAMP_BY_KEY[$result_key]}" ]]; then
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$result_file"
+		fi
+	elif [[ "$file_name" =~ ^[0-9]+_result_(.+)_([0-9]{8}_[0-9]{6})\.json$ ]]; then
 		test_name="${BASH_REMATCH[1]}"
 		result_timestamp="${BASH_REMATCH[2]}"
+		result_key="${test_name}|unknown-gpu|unknown-vram|unknown-driver"
 
-		if [[ -z "${LATEST_TIMESTAMP[$test_name]+isset}" || "$result_timestamp" > "${LATEST_TIMESTAMP[$test_name]}" ]]; then
-			LATEST_TIMESTAMP["$test_name"]="$result_timestamp"
-			LATEST_RESULT_FILE["$test_name"]="$result_file"
+		if [[ -z "${LATEST_TIMESTAMP_BY_KEY[$result_key]+isset}" || "$result_timestamp" > "${LATEST_TIMESTAMP_BY_KEY[$result_key]}" ]]; then
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$result_file"
 		fi
 	fi
 done
 
-for test_name in "${!LATEST_RESULT_FILE[@]}"; do
-	fps_triplet="$(extract_fps_triplet "${LATEST_RESULT_FILE[$test_name]}")"
+for result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+	fps_triplet="$(extract_fps_triplet "${LATEST_RESULT_FILE_BY_KEY[$result_key]}")"
 	IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
 
 	if [[ -n "$min_fps" && -n "$avg_fps" && -n "$max_fps" ]]; then
-		LATEST_MIN_FPS["$test_name"]="$min_fps"
-		LATEST_AVG_FPS["$test_name"]="$avg_fps"
-		LATEST_MAX_FPS["$test_name"]="$max_fps"
+		LATEST_MIN_FPS_BY_KEY["$result_key"]="$min_fps"
+		LATEST_AVG_FPS_BY_KEY["$result_key"]="$avg_fps"
+		LATEST_MAX_FPS_BY_KEY["$result_key"]="$max_fps"
 	fi
 done
 
 write_report_header "$TEMPLATE_FILE" "Cyberpunk 2077 Benchmark Report Template" "Template (blank FPS cells)"
-total_tests="$(append_report_rows "$TEMPLATE_FILE" "no")"
+total_tests="$(append_template_rows "$TEMPLATE_FILE")"
 
 write_report_header "$LATEST_REPORT_FILE" "Cyberpunk 2077 Benchmark Report" "Latest result per test from JSON files"
-filled_rows="$(append_report_rows "$LATEST_REPORT_FILE" "yes")"
+filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
 
 filled_tests=0
 for test_name in "${SELECTED_TESTS[@]}"; do
-	if [[ -n "${LATEST_MIN_FPS[$test_name]+isset}" ]]; then
+	if grep -q "^| ${test_name} |" "$LATEST_REPORT_FILE"; then
 		filled_tests=$((filled_tests + 1))
 	fi
 done
