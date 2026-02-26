@@ -3,6 +3,11 @@
 # Cyberpunk 2077 DLSS/FSR Benchmark on Ubuntu (Steam)
 # ---------------------------------------------------
 SYSTEM_NAME_DEFAULT="$(hostname -s 2>/dev/null || echo "default")"
+SYSTEM_NAME_DEFAULT="${SYSTEM_NAME_DEFAULT,,}"
+SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; s/dolpa//g; s/[-_.]+/-/g; s/^-+|-+$//g')"
+if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
+    SYSTEM_NAME_DEFAULT="default"
+fi
 SYSTEM_NAME="${CP2077_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
 SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
