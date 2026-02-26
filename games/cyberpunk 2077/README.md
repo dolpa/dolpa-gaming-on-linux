@@ -83,6 +83,31 @@ Notes:
 - `SCRIPT_RUN_TIMESTAMP` is generated once per run and reused for all tests in that run.
 - GPU fields are normalized/sanitized for safe filenames.
 
+## System-specific configuration
+
+Machine-dependent paths/settings are now separated from the main script.
+
+Config load order (later files override earlier values):
+
+1. `system/system.<SYSTEM_NAME>.conf.sh` (optional, machine profile)
+2. `CP2077_BENCHMARK_CONFIG=/path/to/file.conf.sh` (optional runtime override)
+
+Quick setup for a new machine:
+
+1. Create a machine file (example for host `AORUS`):
+	- `cp "system/system.AORUS.conf.sh" "system/system.MY_MACHINE.conf.sh"`
+2. Edit `system.MY_MACHINE.conf.sh` with your local Steam/library/Proton paths.
+3. Run benchmark normally.
+
+System name selection:
+
+- Default: short hostname from `hostname -s`
+- Override for current run: `CP2077_SYSTEM_NAME=MY_MACHINE`
+
+Example with explicit config file:
+
+- `CP2077_BENCHMARK_CONFIG="/path/to/my-lab-machine.conf.sh" games/cyberpunk 2077/benchmark/run_cp2077_benchmark.sh --group quick-4k`
+
 ## Reporting flow
 
 `analyze_cp2077_results.sh` reads benchmark JSON files and generates:
