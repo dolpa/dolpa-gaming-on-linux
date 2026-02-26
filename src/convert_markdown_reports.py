@@ -143,8 +143,30 @@ def group_rows(rows: Sequence[ReportRow], split_by_resolution: bool) -> Dict[str
     return grouped
 
 
+def configuration_group(mode: str) -> Tuple[int, str]:
+    normalized = mode.strip().lower()
+
+    if normalized == "native":
+        return (0, normalized)
+    if "quality" in normalized:
+        return (1, normalized)
+    return (2, normalized)
+
+
+def sort_rows_for_visual_report(rows: Sequence[ReportRow]) -> List[ReportRow]:
+    return sorted(
+        rows,
+        key=lambda item: (
+            configuration_group(item.mode)[0],
+            configuration_group(item.mode)[1],
+            -item.avg_fps,
+            item.test_name.lower(),
+        ),
+    )
+
+
 def build_chart(rows: Sequence[ReportRow], title: str) -> plt.Figure:
-    ordered = sorted(rows, key=lambda item: item.avg_fps, reverse=True)
+    ordered = sort_rows_for_visual_report(rows)
 
     labels = [f"{item.test_name} [{item.ray_tracing}]" for item in ordered]
     values = [item.avg_fps for item in ordered]
@@ -204,9 +226,11 @@ def render_html_report(report_name: str, grouped_rows: Dict[str, List[ReportRow]
         title = f"Benchmark Avg FPS - {report_name} - {label}"
         image_b64 = render_chart_base64(rows, title)
 
+        ordered_rows = sort_rows_for_visual_report(rows)
+
         table_rows = "\n".join(
             f"<tr><td>{r.test_name}</td><td>{r.resolution}</td><td>{r.ray_tracing}</td><td>{r.avg_fps:.2f}</td><td>{r.min_fps:.2f}</td><td>{r.max_fps:.2f}</td></tr>"
-            for r in sorted(rows, key=lambda item: item.avg_fps, reverse=True)
+            for r in ordered_rows
         )
 
         sections.append(
