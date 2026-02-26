@@ -117,6 +117,7 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_cp2077_results.sh`):
 
 <!-- TEST_RESULTS_START -->
+- [cp2077_benchmark_report_20260226_201351.md](benchmark/results/cp2077_benchmark_report_20260226_201351.md) - forRTX 2080Ti 11GB (all)
 - [cp2077_benchmark_report_20260226_064937.md](benchmark/results/cp2077_benchmark_report_20260226_064937.md) - from RTX 5060 8GB (4K)
 - [cp2077_benchmark_report_20260225_222442.md](benchmark/results/cp2077_benchmark_report_20260225_222442.md) - from RTX 5060 8GB (1080p and 1440p)
 
