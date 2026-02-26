@@ -104,6 +104,11 @@ Analyzer supports both filename styles:
 
 ## Test Results
 
+Standart testrun:
+`
+./run_cp2077_benchmark.sh --group 1080p-quick-low --group 1080p-quick-medium --group 1080p-quick-high --group 1080p-quick-ultra --group 1440p-quick-low --group 1440p-quick-medium --group 1440p-quick-high --group 1440p-quick-ultra --group 4k-quick-low --group 4k-quick-medium --group 4k-quick-high --group 4k-quick-ultra
+`
+
 Latest report files:
 
 - [benchmark/results/cp2077_benchmark_report_template.md](benchmark/results/cp2077_benchmark_report_template.md)
