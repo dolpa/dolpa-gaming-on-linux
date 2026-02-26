@@ -113,7 +113,10 @@ Historical snapshot reports (auto-updated by `benchmark/analyze_cp2077_results.s
 
 <!-- TEST_RESULTS_START -->
 - [cp2077_benchmark_report_20260226_064937.md](benchmark/results/cp2077_benchmark_report_20260226_064937.md) - from RTX 5060 8GB (4K)
+- [cp2077_benchmark_report_20260226_064937_avg_fps_all.png](benchmark/results/cp2077_benchmark_report_20260226_064937_avg_fps_all.png) - visual chart for 4K snapshot report
 - [cp2077_benchmark_report_20260225_222442.md](benchmark/results/cp2077_benchmark_report_20260225_222442.md) - from RTX 5060 8GB (1080p and 1440p)
+- [cp2077_benchmark_report_20260225_222442_avg_fps_1920x1080.png](benchmark/results/cp2077_benchmark_report_20260225_222442_avg_fps_1920x1080.png) - visual chart for 1080p snapshot report
+- [cp2077_benchmark_report_20260225_222442_avg_fps_2560x1440.png](benchmark/results/cp2077_benchmark_report_20260225_222442_avg_fps_2560x1440.png) - visual chart for 1440p snapshot report
 
 
 <!-- TEST_RESULTS_END -->
