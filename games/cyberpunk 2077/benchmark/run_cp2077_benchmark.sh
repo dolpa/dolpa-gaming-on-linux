@@ -2,22 +2,58 @@
 # ---------------------------------------------------
 # Cyberpunk 2077 DLSS/FSR Benchmark on Ubuntu (Steam)
 # ---------------------------------------------------
-GAME_ID=1091500                                     # Steam AppID for Cyberpunk 2077
-STEAM_PATH="${HOME}/.local/share/Steam"             # Main Steam installation
-STEAM_ROOT="${HOME}/.steam/root"                    # Alternative Steam root path
-CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"         # Custom Steam library path
-ENABLE_MANGOHUD=1
-ENABLE_GAMEMODERUN=0                               # 0=disabled (default), 1=prepend gamemoderun to Proton launch
-PROTON_VERSION="GE-Proton10-25"                      # Adjust version as needed
-BENCHMARK_TIMEOUT_MINUTES=15                        # Per-test timeout in minutes
-BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
-BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30             # Grace period before SIGKILL after timeout
-
-USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"  # User settings directory
-BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults/" # Default folder where game writes benchmark result json files
+SYSTEM_NAME_DEFAULT="$(hostname -s 2>/dev/null || echo "default")"
+SYSTEM_NAME="${CP2077_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"    # Folder where this script stores copied per-test results
+PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
+SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
+SYSTEM_CONFIG_OVERRIDE_FILE="${CP2077_BENCHMARK_CONFIG:-}"
+
+# Built-in defaults (can be overridden by config files below)
+GAME_ID=1091500
+STEAM_PATH="${HOME}/.local/share/Steam"
+STEAM_ROOT="${HOME}/.steam/root"
+CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
+ENABLE_MANGOHUD=1
+ENABLE_GAMEMODERUN=0
+PROTON_VERSION="GE-Proton10-25"
+BENCHMARK_TIMEOUT_MINUTES=15
+BENCHMARK_TIMEOUT_SECONDS=""
+BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30
+USER_SETTINGS_FOLDER=""
+BENCHMARK_RESULTS_SOURCE_DIR=""
+BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"
+
+if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$SYSTEM_CONFIG_LOCAL_FILE"
+fi
+
+if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
+    if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
+        echo "Error: CP2077_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+        exit 1
+    fi
+    # shellcheck source=/dev/null
+    source "$SYSTEM_CONFIG_OVERRIDE_FILE"
+fi
+
+if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
+    BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
+fi
+
+if [[ -z "${USER_SETTINGS_FOLDER:-}" ]]; then
+    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/CD Projekt Red/Cyberpunk 2077"
+fi
+
+if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
+    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/CD Projekt Red/Cyberpunk 2077/benchmarkResults/"
+fi
+
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
 GPU_METADATA_TAG="unknown-gpu_unknown-vram_unknown-driver" # Set once in main and reused in result filenames
 
@@ -246,6 +282,13 @@ show_help() {
     echo "  --timeout-minutes  MIN  Per-test timeout in minutes (default: 15)"
     echo "  --gamemode         Run game launch through gamemoderun"
     echo "  --validate-profiles Check whether profile files exist for tests"
+    echo ""
+    echo "SYSTEM CONFIG FILES (loaded in order):"
+    echo "  1) ${SYSTEM_CONFIG_LOCAL_FILE} (optional, selected by SYSTEM_NAME=${SYSTEM_NAME})"
+    echo "  2) CP2077_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
+    echo ""
+    echo "System selection override:"
+    echo "  CP2077_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
     echo ""
     echo "TESTS:"
     echo "  If no test names are specified, runs default test (native-1080p-low-rt-off)"
