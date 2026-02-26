@@ -3,7 +3,7 @@
 
 STEAM_PATH="${HOME}/.local/share/Steam"             # Main Steam installation
 STEAM_ROOT="${HOME}/.steam/root"                    # Alternative Steam root path
-CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"         # Custom Steam library path
+CUSTOM_LIBRARY_PATH="/mnt/VMData/Steam Library"         # Custom Steam library path
 PROTON_VERSION="GE-Proton9-27"
 
 ENABLE_MANGOHUD=1
