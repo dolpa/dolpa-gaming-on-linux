@@ -112,7 +112,8 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_cp2077_results.sh`):
 
 <!-- TEST_RESULTS_START -->
-- [cp2077_benchmark_report_20260225_222442.md](benchmark/results/cp2077_benchmark_report_20260225_222442.md) - from RTX 5060 8GB
+- [cp2077_benchmark_report_20260226_064937.md](benchmark/results/cp2077_benchmark_report_20260226_064937.md) - from RTX 5060 8GB (4K)
+- [cp2077_benchmark_report_20260225_222442.md](benchmark/results/cp2077_benchmark_report_20260225_222442.md) - from RTX 5060 8GB (1080p and 1440p)
 
 
 <!-- TEST_RESULTS_END -->
@@ -177,6 +178,15 @@ Analyze results:
 	- `games/cyberpunk 2077/benchmark/analyze_cp2077_results.sh --group quick-4k`
 - Analyze specific tests:
 	- `games/cyberpunk 2077/benchmark/analyze_cp2077_results.sh native-1080p-low-rt-off dlss-quality-4k-high-rt-on`
+
+Convert markdown reports to graphical outputs:
+
+- Generate HTML + PNG from one report:
+	- `python3 src/convert_markdown_reports.py games/cyberpunk 2077/benchmark/results/cp2077_benchmark_report.md --format both`
+- Generate only PNG charts split by resolution:
+	- `python3 src/convert_markdown_reports.py games/cyberpunk 2077/benchmark/results/cp2077_benchmark_report.md --format png --split-by-resolution`
+- Process multiple report files at once:
+	- `python3 src/convert_markdown_reports.py games/cyberpunk 2077/benchmark/results/cp2077_benchmark_report.md games/cyberpunk 2077/benchmark/results/cp2077_benchmark_report_20260225_222442.md --format html`
 
 ## Notes
 
