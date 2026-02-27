@@ -395,18 +395,70 @@ register_all_snapshot_report_links_in_readme() {
 	ensure_test_results_section_exists || return 0
 
 	local -a snapshot_files
+	local -a sorted_snapshot_files
+	local -A seen_snapshot_basenames=()
 	shopt -s nullglob
 	snapshot_files=("${RESULTS_DIR}"/cp2077_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
 	shopt -u nullglob
 
+	local links_file
+	links_file="$(mktemp)"
+
 	if [[ ${#snapshot_files[@]} -eq 0 ]]; then
-		return 0
+		echo "$TEST_RESULTS_PLACEHOLDER" > "$links_file"
+	else
+		mapfile -t sorted_snapshot_files < <(printf '%s\n' "${snapshot_files[@]}" | sort -r)
+
+		local snapshot_file snapshot_basename relative_report_path
+		for snapshot_file in "${sorted_snapshot_files[@]}"; do
+			snapshot_basename="$(basename "$snapshot_file")"
+			if [[ -n "${seen_snapshot_basenames[$snapshot_basename]+isset}" ]]; then
+				continue
+			fi
+
+			relative_report_path="benchmark/results/${snapshot_basename}"
+			echo "- [${snapshot_basename}](${relative_report_path})" >> "$links_file"
+			seen_snapshot_basenames["$snapshot_basename"]=1
+		done
+
+		if [[ ! -s "$links_file" ]]; then
+			echo "$TEST_RESULTS_PLACEHOLDER" > "$links_file"
+		fi
 	fi
 
-	local snapshot_file
-	for snapshot_file in $(printf '%s\n' "${snapshot_files[@]}" | sort -r); do
-		register_report_link_in_readme "$snapshot_file"
-	done
+	local temp_file
+	temp_file="$(mktemp)"
+
+	awk \
+		-v start_marker="$TEST_RESULTS_START_MARKER" \
+		-v end_marker="$TEST_RESULTS_END_MARKER" \
+		-v links_file="$links_file" \
+		'
+		$0 == start_marker {
+			print
+			while ((getline link_line < links_file) > 0) {
+				print link_line
+			}
+			close(links_file)
+			in_results_block = 1
+			next
+		}
+		$0 == end_marker {
+			in_results_block = 0
+			print
+			next
+		}
+		in_results_block {
+			next
+		}
+		{
+			print
+		}
+		' "$GAME_README_FILE" > "$temp_file"
+
+	rm -f "$links_file"
+	mv "$temp_file" "$GAME_README_FILE"
+	log_success "Synchronized snapshot report links in README (newest first, no duplicates)."
 }
 
 build_quick_resolution_variant_groups() {
