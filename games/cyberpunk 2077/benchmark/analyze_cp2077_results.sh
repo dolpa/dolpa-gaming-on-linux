@@ -2,6 +2,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+SYSTEM_NAME_DEFAULT="$(hostname -s 2>/dev/null || echo "default")"
+SYSTEM_NAME_DEFAULT="${SYSTEM_NAME_DEFAULT,,}"
+SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; s/dolpa//g; s/[-_.]+/-/g; s/^-+|-+$//g')"
+if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
+	SYSTEM_NAME_DEFAULT="default"
+fi
+SYSTEM_NAME="${CP2077_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${SYSTEM_NAME// /_}"
+
+SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
+SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
+SYSTEM_CONFIG_OVERRIDE_FILE="${CP2077_BENCHMARK_CONFIG:-}"
+
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
@@ -14,12 +29,30 @@ GAME_README_FILE="${SCRIPT_DIR}/../README.md"
 TEST_RESULTS_START_MARKER="<!-- TEST_RESULTS_START -->"
 TEST_RESULTS_END_MARKER="<!-- TEST_RESULTS_END -->"
 TEST_RESULTS_PLACEHOLDER="- _No reports added yet._"
-REPORT_SYSTEM_OS="${REPORT_SYSTEM_OS:-Ubuntu 25.10}"
-REPORT_SYSTEM_KERNEL="${REPORT_SYSTEM_KERNEL:-6.17.0-7-generic}"
-REPORT_SYSTEM_CPU="${REPORT_SYSTEM_CPU:-Intel Xeon E5-2699C v4 @ 2.20GHz}"
-REPORT_SYSTEM_GPU="${REPORT_SYSTEM_GPU:-NVIDIA GeForce RTX 2080 Ti}"
-REPORT_SYSTEM_GPU_DRIVER="${REPORT_SYSTEM_GPU_DRIVER:-NVIDIA 580.105.08}"
-REPORT_SYSTEM_RAM="${REPORT_SYSTEM_RAM:-124 GB}"
+
+PROTON_VERSION="${PROTON_VERSION:-GE-Proton10-25}"
+
+if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$SYSTEM_CONFIG_LOCAL_FILE"
+fi
+
+if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
+	if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
+		echo "Error: CP2077_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+		exit 1
+	fi
+	# shellcheck source=/dev/null
+	source "$SYSTEM_CONFIG_OVERRIDE_FILE"
+fi
+
+REPORT_SYSTEM_OS="${REPORT_SYSTEM_OS:-Ubuntu 24.04.4 LTS}"
+REPORT_SYSTEM_KERNEL="${REPORT_SYSTEM_KERNEL:-6.17.0-14-generic}"
+REPORT_SYSTEM_CPU="${REPORT_SYSTEM_CPU:-Intel Core Ultra 7 265KF}"
+REPORT_SYSTEM_GPU="${REPORT_SYSTEM_GPU:-NVIDIA GeForce RTX 5060}"
+REPORT_SYSTEM_GPU_DRIVER="${REPORT_SYSTEM_GPU_DRIVER:-NVIDIA 590.48.01}"
+REPORT_SYSTEM_RAM="${REPORT_SYSTEM_RAM:-48 GB}"
+REPORT_SYSTEM_PROTON="${REPORT_SYSTEM_PROTON:-${PROTON_VERSION:-}}"
 
 if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
 	echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
@@ -274,12 +307,11 @@ write_report_header() {
 		echo "- OS: ${REPORT_SYSTEM_OS}"
 		echo "- KERNEL: ${REPORT_SYSTEM_KERNEL}"
 		echo "- CPU: ${REPORT_SYSTEM_CPU}"
+		echo "- RAM: ${REPORT_SYSTEM_RAM}"
 		echo "- GPU: ${REPORT_SYSTEM_GPU}"
 		echo "- GPU DRIVER: ${REPORT_SYSTEM_GPU_DRIVER}"
-		echo "- RAM: ${REPORT_SYSTEM_RAM}"
-		echo "- GPU model(s): ${gpu_models}"
 		echo "- GPU VRAM: ${gpu_vrams}"
-		echo "- GPU driver(s): ${gpu_drivers}"
+		echo "- Proton: ${REPORT_SYSTEM_PROTON}"
 		echo
 		echo "| Test Name | Mode | Resolution | Quality | Ray Tracing | Frame Generation | GPU Model | GPU VRAM | Driver | Min FPS | Avg FPS | Max FPS |"
 		echo "|---|---|---|---|---|---|---|---|---|---:|---:|---:|"
