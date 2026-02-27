@@ -38,3 +38,24 @@ Example usage:
 ## Notes
 
 - Keep shell scripts/config on LF line endings for Linux compatibility.
+
+## 👨‍💻 Author
+
+Created by **dolpa** - [Website](https://dolpa.me) | [GitHub](https://github.com/dolpa)
+
+### Connect with the Author
+- 🌐 **Blog:** [dolpa.me](https://dolpa.me)
+- 📡 **RSS Feed:** [Subscribe via RSS](https://dolpa.me/rss)
+- 🐙 **GitHub:** [dolpa on GitHub](https://github.com/dolpa)
+- 📘 **Facebook:** [Facebook Page](https://www.facebook.com/dolpa79)
+- 🐦 **Twitter (X):** [Twitter Profile](https://x.com/_dolpa)
+- 💼 **LinkedIn:** [LinkedIn Profile](https://www.linkedin.com/in/paveldolinin/)
+- 👽 **Reddit:** [Reddit Profile](https://www.reddit.com/user/Accomplished_Try_928/)
+- 💬 **Telegram:** [Telegram Channel](https://t.me/dolpa_me)
+- ▶️ **YouTube:** [YouTube Channel](https://www.youtube.com/c/PavelDolinin)
+
+---
+
+**Enjoy Your Gaming on Linux!** 🎉
+
+*Remember: Don't panic, and always have your bash utilities with you!* 🛠️
