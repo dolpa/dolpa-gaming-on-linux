@@ -17,6 +17,9 @@ SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 SYSTEM_CONFIG_OVERRIDE_FILE="${SOTTR_BENCHMARK_CONFIG:-}"
 SOTTR_PROTON_VERSION_DEFAULT="GE-Proton9-27"
+GAME_ID=750920
+STEAM_PATH="${HOME}/.local/share/Steam"
+CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
 
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
@@ -58,6 +61,28 @@ REPORT_SYSTEM_GPU="${REPORT_SYSTEM_GPU:-NVIDIA GeForce RTX 5060}"
 REPORT_SYSTEM_GPU_DRIVER="${REPORT_SYSTEM_GPU_DRIVER:-NVIDIA 590.48.01}"
 REPORT_SYSTEM_RAM="${REPORT_SYSTEM_RAM:-48 GB}"
 REPORT_SYSTEM_PROTON="${REPORT_SYSTEM_PROTON:-${PROTON_VERSION:-}}"
+
+if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
+	local_native_results_dir="${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/SaveData"
+	local_proton_results_dir="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+	local_proton_results_dir_alt="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+	local_steam_results_dir="${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+	local_steam_results_dir_alt="${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+
+	if [[ -d "$local_native_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+	elif [[ -d "$local_proton_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir"
+	elif [[ -d "$local_proton_results_dir_alt" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir_alt"
+	elif [[ -d "$local_steam_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_steam_results_dir"
+	elif [[ -d "$local_steam_results_dir_alt" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_steam_results_dir_alt"
+	else
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+	fi
+fi
 
 if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
 	echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
@@ -307,7 +332,8 @@ write_report_header() {
 		echo "# ${title}"
 		echo
 		echo "- Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
-		echo "- Source directory: ${RESULTS_DIR}"
+		echo "- JSON archive directory: ${RESULTS_DIR}"
+		echo "- Benchmark source directory: ${BENCHMARK_RESULTS_SOURCE_DIR}"
 		echo "- Mode: ${mode_label}"
 		echo "- OS: ${REPORT_SYSTEM_OS}"
 		echo "- KERNEL: ${REPORT_SYSTEM_KERNEL}"
@@ -640,10 +666,10 @@ REPORT_GPU_VRAMS="N/A"
 REPORT_GPU_DRIVERS="N/A"
 collect_selected_gpu_metadata
 
-write_report_header "$TEMPLATE_FILE" "Rise of the Tomb Raider Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+write_report_header "$TEMPLATE_FILE" "Shadow of the Tomb Raider Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 total_tests="$(append_template_rows "$TEMPLATE_FILE")"
 
-write_report_header "$LATEST_REPORT_FILE" "Rise of the Tomb Raider Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+write_report_header "$LATEST_REPORT_FILE" "Shadow of the Tomb Raider Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
 register_all_snapshot_report_links_in_readme

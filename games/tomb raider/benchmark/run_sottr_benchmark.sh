@@ -59,7 +59,19 @@ if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
 fi
 
 if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
-    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+    local_native_results_dir="${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/SaveData"
+    local_proton_results_dir="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+    local_proton_results_dir_alt="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+
+    if [[ -d "$local_native_results_dir" ]]; then
+        BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+    elif [[ -d "$local_proton_results_dir" ]]; then
+        BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir"
+    elif [[ -d "$local_proton_results_dir_alt" ]]; then
+        BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir_alt"
+    else
+        BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+    fi
 fi
 
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
@@ -454,8 +466,16 @@ detect_gpu_metadata() {
 copy_benchmark_result_file() {
     local test_name="$1"
     local log="$2"
-    local source_dir="$BENCHMARK_RESULTS_SOURCE_DIR"
+    local source_dir=""
     local output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
+    local -a source_dir_candidates=(
+        "$BENCHMARK_RESULTS_SOURCE_DIR"
+        "${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/SaveData"
+        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+    )
 
     mkdir -p "$output_dir"
 
@@ -463,22 +483,20 @@ copy_benchmark_result_file() {
         SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
     fi
 
-    if [[ ! -d "$source_dir" ]]; then
-        local alternate_source_dir=""
-        if [[ "$source_dir" == *"/Documents/"* ]]; then
-            alternate_source_dir="${source_dir/\/Documents\//\/My Documents\/}"
-        elif [[ "$source_dir" == *"/My Documents/"* ]]; then
-            alternate_source_dir="${source_dir/\/My Documents\//\/Documents\/}"
+    local candidate_dir
+    for candidate_dir in "${source_dir_candidates[@]}"; do
+        if [[ -n "$candidate_dir" && -d "$candidate_dir" ]]; then
+            source_dir="$candidate_dir"
+            break
         fi
+    done
 
-        if [[ -n "$alternate_source_dir" && -d "$alternate_source_dir" ]]; then
-            source_dir="$alternate_source_dir"
-            log_to_file info "$log" "Using alternate benchmark source directory: $source_dir"
-        else
-            log_to_file warning "$log" "Benchmark source directory not found: $source_dir"
-            return 0
-        fi
+    if [[ -z "$source_dir" ]]; then
+        log_to_file warning "$log" "Benchmark source directory not found. Checked: ${source_dir_candidates[*]}"
+        return 0
     fi
+
+    log_to_file info "$log" "Using benchmark source directory: $source_dir"
 
     local latest_benchmark_dir
     latest_benchmark_dir="$(find "$source_dir" -mindepth 1 -maxdepth 1 -type d -name "benchmark_*" -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
@@ -767,6 +785,7 @@ run_bench() {
         -nolauncher
         -benchmark
         -silent
+        --non-interactive
     )
 
     log_to_file info "$log" "Executable selected: $exe_path"
