@@ -18,6 +18,7 @@ PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 SYSTEM_CONFIG_OVERRIDE_FILE="${ROTTR_BENCHMARK_CONFIG:-}"
+ROTTR_PROTON_VERSION="GE-Proton9-27"
 
 # Built-in defaults (can be overridden by config files below)
 GAME_ID=391220
@@ -26,7 +27,6 @@ STEAM_ROOT="${HOME}/.steam/root"
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
 ENABLE_MANGOHUD=1
 ENABLE_GAMEMODERUN=0
-PROTON_VERSION="GE-Proton10-25"
 BENCHMARK_TIMEOUT_MINUTES=15
 BENCHMARK_TIMEOUT_SECONDS=""
 BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30
@@ -47,6 +47,12 @@ if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$SYSTEM_CONFIG_OVERRIDE_FILE"
 fi
+
+# Proton selection precedence:
+# 1) ROTTR_PROTON_VERSION (game-specific override)
+# 2) PROTON_VERSION (shared system default)
+# 3) ROTTR_PROTON_VERSION_DEFAULT (game fallback)
+PROTON_VERSION="${ROTTR_PROTON_VERSION:-${PROTON_VERSION:-$ROTTR_PROTON_VERSION_DEFAULT}}"
 
 if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
     BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
@@ -736,12 +742,8 @@ run_bench() {
 
     local -a direct_benchmark_args=(
         -nolauncher
-        --launcher-skip
-        --intro-skip
         -benchmark
-        --benchmark
-        /benchmark
-        benchmark
+        -silent
     )
 
     log_to_file info "$log" "Executable selected: $exe_path"
