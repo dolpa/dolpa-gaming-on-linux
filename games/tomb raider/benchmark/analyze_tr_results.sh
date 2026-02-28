@@ -10,20 +10,20 @@ SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; 
 if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
 	SYSTEM_NAME_DEFAULT="default"
 fi
-SYSTEM_NAME="${CP2077_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${TR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
 SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
-SYSTEM_CONFIG_OVERRIDE_FILE="${CP2077_BENCHMARK_CONFIG:-}"
+SYSTEM_CONFIG_OVERRIDE_FILE="${TR_BENCHMARK_CONFIG:-}"
 
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
 GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
-TEMPLATE_FILE="${RESULTS_DIR}/cp2077_benchmark_report_template.md"
-LATEST_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report.md"
-TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
+TEMPLATE_FILE="${RESULTS_DIR}/tr_benchmark_report_template.md"
+LATEST_REPORT_FILE="${RESULTS_DIR}/tr_benchmark_report.md"
+TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/tr_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
 BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
 GAME_README_FILE="${SCRIPT_DIR}/../README.md"
 TEST_RESULTS_START_MARKER="<!-- TEST_RESULTS_START -->"
@@ -39,7 +39,7 @@ fi
 
 if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
 	if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
-		echo "Error: CP2077_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+		echo "Error: TR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
 		exit 1
 	fi
 	# shellcheck source=/dev/null
@@ -376,10 +376,10 @@ ensure_test_results_section_exists() {
 		echo
 		echo "Latest report files:"
 		echo
-		echo "- [benchmark/results/cp2077_benchmark_report_template.md](benchmark/results/cp2077_benchmark_report_template.md)"
-		echo "- [benchmark/results/cp2077_benchmark_report.md](benchmark/results/cp2077_benchmark_report.md)"
+		echo "- [benchmark/results/tr_benchmark_report_template.md](benchmark/results/tr_benchmark_report_template.md)"
+		echo "- [benchmark/results/tr_benchmark_report.md](benchmark/results/tr_benchmark_report.md)"
 		echo
-		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_cp2077_results.sh\\`):"
+		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_tr_results.sh\\`):"
 		echo
 		echo "$TEST_RESULTS_START_MARKER"
 		echo "$TEST_RESULTS_PLACEHOLDER"
@@ -442,7 +442,7 @@ register_all_snapshot_report_links_in_readme() {
 	local -a sorted_snapshot_files
 	local -A seen_snapshot_basenames=()
 	shopt -s nullglob
-	snapshot_files=("${RESULTS_DIR}"/cp2077_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
+	snapshot_files=("${RESULTS_DIR}"/tr_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
 	shopt -u nullglob
 
 	local links_file
@@ -635,10 +635,10 @@ REPORT_GPU_VRAMS="N/A"
 REPORT_GPU_DRIVERS="N/A"
 collect_selected_gpu_metadata
 
-write_report_header "$TEMPLATE_FILE" "Tomb Raider Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+write_report_header "$TEMPLATE_FILE" "Rise of the Tomb Raider Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 total_tests="$(append_template_rows "$TEMPLATE_FILE")"
 
-write_report_header "$LATEST_REPORT_FILE" "Tomb Raider Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+write_report_header "$LATEST_REPORT_FILE" "Rise of the Tomb Raider Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
 register_all_snapshot_report_links_in_readme

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------
-# Tomb Raider DLSS/FSR Benchmark on Ubuntu (Steam)
+# Rise of the Tomb Raider DLSS/FSR Benchmark on Ubuntu (Steam)
 # ---------------------------------------------------
 SYSTEM_NAME_DEFAULT="$(hostname -s 2>/dev/null || echo "default")"
 SYSTEM_NAME_DEFAULT="${SYSTEM_NAME_DEFAULT,,}"
@@ -20,7 +20,7 @@ SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 SYSTEM_CONFIG_OVERRIDE_FILE="${TR_BENCHMARK_CONFIG:-}"
 
 # Built-in defaults (can be overridden by config files below)
-GAME_ID=1091500
+GAME_ID=391220
 STEAM_PATH="${HOME}/.local/share/Steam"
 STEAM_ROOT="${HOME}/.steam/root"
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
@@ -53,11 +53,11 @@ if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
 fi
 
 if [[ -z "${USER_SETTINGS_FOLDER:-}" ]]; then
-    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/Crystal Dynamics/Tomb Raider"
+    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Application Data/Crystal Dynamics/Rise of the Tomb Raider/"
 fi
 
 if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
-    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Crystal Dynamics/Tomb Raider/benchmarkResults/"
+    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Rise of the Tomb Raider/"
 fi
 
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
@@ -276,7 +276,7 @@ build_dynamic_groups
 
 # Function to show help
 show_help() {
-    echo "Tomb Raider Benchmark Script"
+    echo "Rise of the Tomb Raider Benchmark Script"
     echo "Usage: $0 [OPTIONS] [TEST_NAME...]"
     echo ""
     echo "OPTIONS:"
@@ -291,10 +291,10 @@ show_help() {
     echo ""
     echo "SYSTEM CONFIG FILES (loaded in order):"
     echo "  1) ${SYSTEM_CONFIG_LOCAL_FILE} (optional, selected by SYSTEM_NAME=${SYSTEM_NAME})"
-    echo "  2) CP2077_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
+    echo "  2) TR_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
     echo ""
     echo "System selection override:"
-    echo "  CP2077_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
+    echo "  TR_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
     echo ""
     echo "TESTS:"
     echo "  If no test names are specified, runs default test (native-1080p-low-rt-off)"
@@ -697,24 +697,53 @@ run_bench() {
     fi
 
     # Find game installation - check multiple possible locations
-    local game_path="$STEAM_PATH/steamapps/common/Tomb Raider"
-    if [[ ! -d "$game_path" ]]; then
-        game_path="$STEAM_ROOT/steamapps/common/Tomb Raider"
-        if [[ ! -d "$game_path" ]]; then
-            game_path="$CUSTOM_LIBRARY_PATH/steamapps/common/Tomb Raider"
-            if [[ ! -d "$game_path" ]]; then
-                log_to_file error "$log" "Tomb Raider not found in any of these locations:"
-                log_to_file error "$log" "  - $STEAM_PATH/steamapps/common/Tomb Raider"
-                log_to_file error "$log" "  - $STEAM_ROOT/steamapps/common/Tomb Raider"
-                log_to_file error "$log" "  - $CUSTOM_LIBRARY_PATH/steamapps/common/Tomb Raider"
-                return 1
-            fi
+    local -a game_dir_candidates=(
+        "$STEAM_PATH/steamapps/common/Rise of the Tomb Raider"
+        "$STEAM_ROOT/steamapps/common/Rise of the Tomb Raider"
+        "$CUSTOM_LIBRARY_PATH/steamapps/common/Rise of the Tomb Raider"
+        "$STEAM_PATH/steamapps/common/Tomb Raider"
+        "$STEAM_ROOT/steamapps/common/Tomb Raider"
+        "$CUSTOM_LIBRARY_PATH/steamapps/common/Tomb Raider"
+    )
+
+    local game_path=""
+    local candidate_dir
+    for candidate_dir in "${game_dir_candidates[@]}"; do
+        if [[ -d "$candidate_dir" ]]; then
+            game_path="$candidate_dir"
+            break
         fi
+    done
+
+    if [[ -z "$game_path" ]]; then
+        log_to_file error "$log" "Rise of the Tomb Raider not found in any known location:"
+        for candidate_dir in "${game_dir_candidates[@]}"; do
+            log_to_file error "$log" "  - $candidate_dir"
+        done
+        return 1
     fi
 
-    local exe_path="$game_path/bin/x64/TombRaider.exe"
-    if [[ ! -f "$exe_path" ]]; then
-        log_to_file error "$log" "Game executable not found at $exe_path"
+    local -a exe_candidates=(
+        "$game_path/bin/x64/ROTTR.exe"
+        "$game_path/ROTTR.exe"
+        "$game_path/bin/x64/TombRaider.exe"
+        "$game_path/TombRaider.exe"
+    )
+
+    local exe_path=""
+    local candidate_exe
+    for candidate_exe in "${exe_candidates[@]}"; do
+        if [[ -f "$candidate_exe" ]]; then
+            exe_path="$candidate_exe"
+            break
+        fi
+    done
+
+    if [[ -z "$exe_path" ]]; then
+        log_to_file error "$log" "Game executable not found. Checked:"
+        for candidate_exe in "${exe_candidates[@]}"; do
+            log_to_file error "$log" "  - $candidate_exe"
+        done
         return 1
     fi
 
@@ -774,7 +803,7 @@ run_bench() {
         "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
         "$proton_path/proton" run wineserver -k >>"$log" 2>&1 || true
 
-    pkill -f "TombRaider.exe|TombRaiderLauncher.exe|CrashReporter" >/dev/null 2>&1 || true
+    pkill -f "ROTTR.exe|ROTTR_DX12.exe|TombRaider.exe|TombRaiderLauncher.exe|CrashReporter" >/dev/null 2>&1 || true
 
     if [[ $exit_code -eq 0 ]]; then
         log_to_file success "$log" "Benchmark completed successfully for $mode"
@@ -879,7 +908,7 @@ main() {
 
     # Create log file
     local logfile="${SCRIPT_DIR}/logs/tr_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
-    echo "Tomb Raider Upscaling Benchmark – $(date)" >"$logfile"
+    echo "Rise of the Tomb Raider Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
     echo "GPU Metadata: $GPU_METADATA_TAG" >>"$logfile"
