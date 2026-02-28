@@ -8,7 +8,7 @@ SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; 
 if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
     SYSTEM_NAME_DEFAULT="default"
 fi
-SYSTEM_NAME="${TR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${ROTTR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
 SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
 
@@ -17,7 +17,7 @@ PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
-SYSTEM_CONFIG_OVERRIDE_FILE="${TR_BENCHMARK_CONFIG:-}"
+SYSTEM_CONFIG_OVERRIDE_FILE="${ROTTR_BENCHMARK_CONFIG:-}"
 
 # Built-in defaults (can be overridden by config files below)
 GAME_ID=391220
@@ -30,9 +30,9 @@ PROTON_VERSION="GE-Proton10-25"
 BENCHMARK_TIMEOUT_MINUTES=15
 BENCHMARK_TIMEOUT_SECONDS=""
 BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30
-USER_SETTINGS_FOLDER=""
 BENCHMARK_RESULTS_SOURCE_DIR=""
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"
+PROFILES_DIR="${SCRIPT_DIR}/profiles"
 
 if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
     # shellcheck source=/dev/null
@@ -41,7 +41,7 @@ fi
 
 if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
     if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
-        echo "Error: TR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+        echo "Error: ROTTR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
         exit 1
     fi
     # shellcheck source=/dev/null
@@ -52,12 +52,8 @@ if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
     BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
 fi
 
-if [[ -z "${USER_SETTINGS_FOLDER:-}" ]]; then
-    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Application Data/Crystal Dynamics/Rise of the Tomb Raider/"
-fi
-
 if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
-    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Rise of the Tomb Raider/"
+    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Rise of the Tomb Raider/"
 fi
 
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
@@ -96,9 +92,9 @@ for base_test_name in "${!TESTS[@]}"; do
 
     for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
         fg_test_name="${base_test_name}-${fg_suffix}"
-        fg_profile_file="${SCRIPT_DIR}/profiles/UserSettings.${fg_test_name}.json"
+        fg_profile_file_rise="${PROFILES_DIR}/${fg_test_name}.profile.conf.sh"
 
-        if [[ -f "$fg_profile_file" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
+        if [[ -f "$fg_profile_file_rise" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
             read -r mode resolution quality ray_tracing frame_generation <<< "${TESTS[$base_test_name]}"
             case "$fg_suffix" in
                 fg-dlss)
@@ -291,10 +287,10 @@ show_help() {
     echo ""
     echo "SYSTEM CONFIG FILES (loaded in order):"
     echo "  1) ${SYSTEM_CONFIG_LOCAL_FILE} (optional, selected by SYSTEM_NAME=${SYSTEM_NAME})"
-    echo "  2) TR_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
+    echo "  2) ROTTR_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
     echo ""
     echo "System selection override:"
-    echo "  TR_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
+    echo "  ROTTR_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
     echo ""
     echo "TESTS:"
     echo "  If no test names are specified, runs default test (native-1080p-low-rt-off)"
@@ -339,25 +335,25 @@ show_help() {
     echo "  $0 native-1440p-ultra-rt-on dlss3-quality-1440p-high-rt-on-fg-frs31"
     echo ""
     echo "PROFILE FILES:"
-    echo "  Each test expects a profile file in profiles/ directory named:"
-    echo "  UserSettings.{TEST_NAME}.json"
-    echo "  Example: UserSettings.fsr3-quality-4k-high-rt-off-fg-dlss.json"
+    echo "  Rise profile format:"
+    echo "    profiles/{TEST_NAME}.profile.conf.sh"
+    echo "  Example: profiles/fsr3-quality-4k-high-rt-off.profile.conf.sh"
     echo ""
 }
 
 validate_profiles() {
     local missing_count=0
 
-    if [[ ! -d "${SCRIPT_DIR}/profiles" ]]; then
-        log_error "Profiles directory not found: ${SCRIPT_DIR}/profiles"
+    if [[ ! -d "$PROFILES_DIR" ]]; then
+        log_error "Profiles directory not found: $PROFILES_DIR"
         return 1
     fi
 
-    log_info "Validating profile files in ${SCRIPT_DIR}/profiles ..."
+    log_info "Validating profile files in $PROFILES_DIR ..."
     for test_name in "${!TESTS[@]}"; do
-        local profile_file="${SCRIPT_DIR}/profiles/UserSettings.${test_name}.json"
-        if [[ ! -f "$profile_file" ]]; then
-            log_warning "Missing: UserSettings.${test_name}.json"
+        local profile_file_rise="${PROFILES_DIR}/${test_name}.profile.conf.sh"
+        if [[ ! -f "$profile_file_rise" ]]; then
+            log_warning "Missing: ${test_name}.profile.conf.sh"
             missing_count=$((missing_count + 1))
         fi
     done
@@ -462,8 +458,20 @@ copy_benchmark_result_file() {
     fi
 
     if [[ ! -d "$source_dir" ]]; then
-        log_to_file warning "$log" "Benchmark source directory not found: $source_dir"
-        return 0
+        local alternate_source_dir=""
+        if [[ "$source_dir" == *"/Documents/"* ]]; then
+            alternate_source_dir="${source_dir/\/Documents\//\/My Documents\/}"
+        elif [[ "$source_dir" == *"/My Documents/"* ]]; then
+            alternate_source_dir="${source_dir/\/My Documents\//\/Documents\/}"
+        fi
+
+        if [[ -n "$alternate_source_dir" && -d "$alternate_source_dir" ]]; then
+            source_dir="$alternate_source_dir"
+            log_to_file info "$log" "Using alternate benchmark source directory: $source_dir"
+        else
+            log_to_file warning "$log" "Benchmark source directory not found: $source_dir"
+            return 0
+        fi
     fi
 
     local latest_benchmark_dir
@@ -511,9 +519,6 @@ apply_setting() {
     local -n launch_args_ref="$output_array_name"
 
     local original_mode="$mode"
-    local settings_dir="$USER_SETTINGS_FOLDER"
-    local profile_dir="${SCRIPT_DIR}/profiles"
-    local target_settings_file="${settings_dir}/UserSettings.json"
     # Validate mode and extract base mode for profile matching
     case "$mode" in
         none)
@@ -580,55 +585,35 @@ apply_setting() {
             return 1
             ;;
     esac
-    # Set launch arguments based on mode and resolution
+    # Default launch arguments for Rise benchmark
     launch_args_ref=(--resolution "$resolution")
 
-    if [[ ! -d "$profile_dir" ]]; then
-        log_to_file error "$log" "Profiles directory does not exist: $profile_dir"
-        return 1
-    fi
-
-    # Check if user settings directory exists
-    if [[ ! -d "$settings_dir" ]]; then
-        log_to_file error "$log" "User settings directory does not exist: $settings_dir"
-        log_to_file warning "$log" "Please ensure the game has been run at least once to create the settings directory."
-        return 1
-    fi
-
-    # Look for exact profile match based on test name or parameters
-    local exact_profile=""
-    
+    local rise_profile=""
     if [[ -n "$test_name" ]]; then
-        # Use test name for profile matching (preferred method)
-        exact_profile="${profile_dir}/UserSettings.${test_name}.json"
-    else
-        # Fallback to parameter-based naming for backward compatibility
-        exact_profile="${profile_dir}/UserSettings.${original_mode}.${quality_preset}.rt-${ray_tracing}.fg-${frame_generation}.json"
-    fi
-    # Check if the exact profile file exists and copy it to the target settings location
-    if [[ -f "$exact_profile" ]]; then
-        cp "$exact_profile" "$target_settings_file"
-        if [[ $? -eq 0 ]]; then
-            log_to_file success "$log" "Applied settings profile: $exact_profile"
-        else
-            log_to_file error "$log" "Failed to copy settings profile to $target_settings_file"
-            return 1
-        fi
-    else
-        log_to_file error "$log" "Required settings profile not found: $exact_profile"
-        if [[ -n "$test_name" ]]; then
-            log_to_file error "$log" "Expected profile file: UserSettings.${test_name}.json"
-        else
-            log_to_file error "$log" "Available parameters: mode=$original_mode, quality=$quality_preset, ray_tracing=$ray_tracing, frame_generation=$frame_generation"
-        fi
-        log_to_file warning "$log" "Please ensure the exact profile file exists in $profile_dir"
-        return 1
+        rise_profile="${PROFILES_DIR}/${test_name}.profile.conf.sh"
     fi
 
-    # Verify that UserSettings.json exists after applying settings
-    if [[ ! -f "$target_settings_file" ]]; then
-        log_to_file error "$log" "UserSettings.json file does not exist at $target_settings_file"
-        log_to_file warning "$log" "Please ensure a valid settings profile was applied or the game has been configured."
+    if [[ -n "$rise_profile" && -f "$rise_profile" ]]; then
+        local profile_mode="$original_mode"
+        local profile_resolution="$resolution"
+        local profile_quality="$quality_preset"
+        local profile_ray_tracing="$ray_tracing"
+        local profile_frame_generation="$frame_generation"
+        local -a profile_launch_args=(--resolution "$resolution")
+
+        # shellcheck source=/dev/null
+        source "$rise_profile"
+
+        launch_args_ref=("${profile_launch_args[@]}")
+        log_to_file success "$log" "Applied Rise profile: $rise_profile"
+    else
+        log_to_file error "$log" "Required profile not found for test '${test_name:-manual}'"
+        if [[ -n "$test_name" ]]; then
+            log_to_file error "$log" "Expected Rise profile:"
+            log_to_file error "$log" "  - $rise_profile"
+        else
+            log_to_file error "$log" "Manual mode without test name requires explicit test profile support."
+        fi
         return 1
     fi
     # Log the applied settings for reference
@@ -724,6 +709,8 @@ run_bench() {
     fi
 
     local -a exe_candidates=(
+        "$game_path/bin/x64/ROTTR_DX12.exe"
+        "$game_path/ROTTR_DX12.exe"
         "$game_path/bin/x64/ROTTR.exe"
         "$game_path/ROTTR.exe"
         "$game_path/bin/x64/TombRaider.exe"
@@ -747,6 +734,18 @@ run_bench() {
         return 1
     fi
 
+    local -a direct_benchmark_args=(
+        -nolauncher
+        --launcher-skip
+        --intro-skip
+        -benchmark
+        --benchmark
+        /benchmark
+        benchmark
+    )
+
+    log_to_file info "$log" "Executable selected: $exe_path"
+
     log_to_file info "$log" "=== Running mode=$mode resolution=$res quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation ==="
     
     # Set up environment
@@ -756,6 +755,7 @@ run_bench() {
     local -a launch_args
 
     apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
+    log_to_file info "$log" "Launch args: ${direct_benchmark_args[*]} ${launch_args[*]}"
 
     local -a proton_run_cmd
     proton_run_cmd=("$proton_path/proton")
@@ -769,29 +769,37 @@ run_bench() {
         fi
     fi
 
+    local -a full_launch_cmd=(
+        timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
+        env
+        "SteamAppId=${GAME_ID}"
+        "SteamGameId=${GAME_ID}"
+        "PROTON_VERB=waitforexitandrun"
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
+        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
+        "STEAM_RUNTIME=1"
+        "PROTON_LOG=1"
+        "VKD3D_FEATURE_LEVEL=12_0"
+        "${proton_run_cmd[@]}" run
+        "$exe_path"
+        "${direct_benchmark_args[@]}"
+        "${launch_args[@]}"
+    )
+
+    local full_launch_cmd_pretty=""
+    printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
+    log_to_file info "$log" "Full launch command: cd $(printf '%q' "$game_path") && ${full_launch_cmd_pretty% }"
+
     # Launch the game with Proton
     if ! command -v timeout >/dev/null 2>&1; then
         log_to_file error "$log" "Required command 'timeout' not found. Please install coreutils."
         return 1
     fi
 
-    timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s" \
-        env \
-        "SteamAppId=${GAME_ID}" \
-        "SteamGameId=${GAME_ID}" \
-        "PROTON_VERB=waitforexitandrun" \
-        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
-        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
-        "STEAM_RUNTIME=1" \
-        "PROTON_LOG=1" \
-        "VKD3D_FEATURE_LEVEL=12_0" \
-        "${proton_run_cmd[@]}" run \
-        "$exe_path" \
-        --launcher-skip \
-        --intro-skip \
-        "${launch_args[@]}" \
-        -benchmark \
-        >>"$log" 2>&1
+    (
+        cd "$game_path" || exit 1
+        "${full_launch_cmd[@]}"
+    ) >>"$log" 2>&1
     
     local exit_code=$?
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
@@ -907,7 +915,7 @@ main() {
     mkdir -p "${SCRIPT_DIR}/logs"
 
     # Create log file
-    local logfile="${SCRIPT_DIR}/logs/tr_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
+    local logfile="${SCRIPT_DIR}/logs/rottr_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
     echo "Rise of the Tomb Raider Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
