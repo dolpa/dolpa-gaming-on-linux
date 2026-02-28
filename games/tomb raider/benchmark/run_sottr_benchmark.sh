@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------
-# Rise of the Tomb Raider DLSS/FSR Benchmark on Ubuntu (Steam)
+# Shadow of the Tomb Raider DLSS/FSR Benchmark on Ubuntu (Steam)
 # ---------------------------------------------------
 SYSTEM_NAME_DEFAULT="$(hostname -s 2>/dev/null || echo "default")"
 SYSTEM_NAME_DEFAULT="${SYSTEM_NAME_DEFAULT,,}"
@@ -8,7 +8,7 @@ SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; 
 if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
     SYSTEM_NAME_DEFAULT="default"
 fi
-SYSTEM_NAME="${ROTTR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${SOTTR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
 SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
 
@@ -17,11 +17,11 @@ PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
-SYSTEM_CONFIG_OVERRIDE_FILE="${ROTTR_BENCHMARK_CONFIG:-}"
-ROTTR_PROTON_VERSION="GE-Proton9-27"
+SYSTEM_CONFIG_OVERRIDE_FILE="${SOTTR_BENCHMARK_CONFIG:-}"
+SOTTR_PROTON_VERSION_DEFAULT="GE-Proton9-27"
 
 # Built-in defaults (can be overridden by config files below)
-GAME_ID=391220
+GAME_ID=750920
 STEAM_PATH="${HOME}/.local/share/Steam"
 STEAM_ROOT="${HOME}/.steam/root"
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
@@ -41,7 +41,7 @@ fi
 
 if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
     if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
-        echo "Error: ROTTR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+        echo "Error: SOTTR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
         exit 1
     fi
     # shellcheck source=/dev/null
@@ -49,17 +49,17 @@ if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
 fi
 
 # Proton selection precedence:
-# 1) ROTTR_PROTON_VERSION (game-specific override)
-# 2) PROTON_VERSION (shared system default)
-# 3) ROTTR_PROTON_VERSION_DEFAULT (game fallback)
-PROTON_VERSION="${ROTTR_PROTON_VERSION:-${PROTON_VERSION:-$ROTTR_PROTON_VERSION_DEFAULT}}"
+# 1) SOTTR_PROTON_VERSION (game-specific override)
+# 2) SOTTR_PROTON_VERSION_DEFAULT (game default)
+# 3) PROTON_VERSION (shared system default)
+PROTON_VERSION="${SOTTR_PROTON_VERSION:-${SOTTR_PROTON_VERSION_DEFAULT:-${PROTON_VERSION:-}}}"
 
 if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
     BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
 fi
 
 if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
-    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Rise of the Tomb Raider/"
+    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
 fi
 
 SCRIPT_RUN_TIMESTAMP=""                                 # Set once in main and reused by all tests in the same run
@@ -98,9 +98,9 @@ for base_test_name in "${!TESTS[@]}"; do
 
     for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
         fg_test_name="${base_test_name}-${fg_suffix}"
-        fg_profile_file_rise="${PROFILES_DIR}/${fg_test_name}.profile.conf.sh"
+        fg_profile_file_sottr="${PROFILES_DIR}/${fg_test_name}.profile.conf.sh"
 
-        if [[ -f "$fg_profile_file_rise" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
+        if [[ -f "$fg_profile_file_sottr" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
             read -r mode resolution quality ray_tracing frame_generation <<< "${TESTS[$base_test_name]}"
             case "$fg_suffix" in
                 fg-dlss)
@@ -278,7 +278,7 @@ build_dynamic_groups
 
 # Function to show help
 show_help() {
-    echo "Rise of the Tomb Raider Benchmark Script"
+    echo "Shadow of the Tomb Raider Benchmark Script"
     echo "Usage: $0 [OPTIONS] [TEST_NAME...]"
     echo ""
     echo "OPTIONS:"
@@ -293,10 +293,10 @@ show_help() {
     echo ""
     echo "SYSTEM CONFIG FILES (loaded in order):"
     echo "  1) ${SYSTEM_CONFIG_LOCAL_FILE} (optional, selected by SYSTEM_NAME=${SYSTEM_NAME})"
-    echo "  2) ROTTR_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
+    echo "  2) SOTTR_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
     echo ""
     echo "System selection override:"
-    echo "  ROTTR_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
+    echo "  SOTTR_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
     echo ""
     echo "TESTS:"
     echo "  If no test names are specified, runs default test (native-1080p-low-rt-off)"
@@ -341,7 +341,7 @@ show_help() {
     echo "  $0 native-1440p-ultra-rt-on dlss3-quality-1440p-high-rt-on-fg-frs31"
     echo ""
     echo "PROFILE FILES:"
-    echo "  Rise profile format:"
+    echo "  Shadow of the Tomb Raider profile format:"
     echo "    profiles/{TEST_NAME}.profile.conf.sh"
     echo "  Example: profiles/fsr3-quality-4k-high-rt-off.profile.conf.sh"
     echo ""
@@ -357,8 +357,8 @@ validate_profiles() {
 
     log_info "Validating profile files in $PROFILES_DIR ..."
     for test_name in "${!TESTS[@]}"; do
-        local profile_file_rise="${PROFILES_DIR}/${test_name}.profile.conf.sh"
-        if [[ ! -f "$profile_file_rise" ]]; then
+        local profile_file_sottr="${PROFILES_DIR}/${test_name}.profile.conf.sh"
+        if [[ ! -f "$profile_file_sottr" ]]; then
             log_warning "Missing: ${test_name}.profile.conf.sh"
             missing_count=$((missing_count + 1))
         fi
@@ -591,15 +591,15 @@ apply_setting() {
             return 1
             ;;
     esac
-    # Default launch arguments for Rise benchmark
+    # Default launch arguments for Shadow of the Tomb Raider benchmark
     launch_args_ref=(--resolution "$resolution")
 
-    local rise_profile=""
+    local sottr_profile=""
     if [[ -n "$test_name" ]]; then
-        rise_profile="${PROFILES_DIR}/${test_name}.profile.conf.sh"
+        sottr_profile="${PROFILES_DIR}/${test_name}.profile.conf.sh"
     fi
 
-    if [[ -n "$rise_profile" && -f "$rise_profile" ]]; then
+    if [[ -n "$sottr_profile" && -f "$sottr_profile" ]]; then
         local profile_mode="$original_mode"
         local profile_resolution="$resolution"
         local profile_quality="$quality_preset"
@@ -608,15 +608,15 @@ apply_setting() {
         local -a profile_launch_args=(--resolution "$resolution")
 
         # shellcheck source=/dev/null
-        source "$rise_profile"
+        source "$sottr_profile"
 
         launch_args_ref=("${profile_launch_args[@]}")
-        log_to_file success "$log" "Applied Rise profile: $rise_profile"
+        log_to_file success "$log" "Applied Shadow of the Tomb Raider profile: $sottr_profile"
     else
         log_to_file error "$log" "Required profile not found for test '${test_name:-manual}'"
         if [[ -n "$test_name" ]]; then
-            log_to_file error "$log" "Expected Rise profile:"
-            log_to_file error "$log" "  - $rise_profile"
+            log_to_file error "$log" "Expected Shadow of the Tomb Raider profile:"
+            log_to_file error "$log" "  - $sottr_profile"
         else
             log_to_file error "$log" "Manual mode without test name requires explicit test profile support."
         fi
@@ -677,24 +677,14 @@ run_bench() {
     local frame_generation=${6:-off}    # frame generation: off, on, auto
     local test_name=${7:-""}            # test name for profile matching
 
-    # Find Proton installation - check Steam root and custom library possible locations
-    local proton_path="$STEAM_PATH/compatibilitytools.d/$PROTON_VERSION"
-    if [[ ! -d "$proton_path" ]]; then
-        proton_path="$STEAM_ROOT/compatibilitytools.d/$PROTON_VERSION"
-        if [[ ! -d "$proton_path" ]]; then
-            log_to_file error "$log" "Proton $PROTON_VERSION not found"
-            return 1
-        fi
-    fi
-
-    # Find game installation - check multiple possible locations
+    # Find game installation - check multiple possible locations (full + trial)
     local -a game_dir_candidates=(
-        "$STEAM_PATH/steamapps/common/Rise of the Tomb Raider"
-        "$STEAM_ROOT/steamapps/common/Rise of the Tomb Raider"
-        "$CUSTOM_LIBRARY_PATH/steamapps/common/Rise of the Tomb Raider"
-        "$STEAM_PATH/steamapps/common/Tomb Raider"
-        "$STEAM_ROOT/steamapps/common/Tomb Raider"
-        "$CUSTOM_LIBRARY_PATH/steamapps/common/Tomb Raider"
+        "$STEAM_PATH/steamapps/common/Shadow of the Tomb Raider"
+        "$STEAM_PATH/steamapps/common/Shadow of the Tomb Raider Trial"
+        "$STEAM_ROOT/steamapps/common/Shadow of the Tomb Raider"
+        "$STEAM_ROOT/steamapps/common/Shadow of the Tomb Raider Trial"
+        "$CUSTOM_LIBRARY_PATH/steamapps/common/Shadow of the Tomb Raider"
+        "$CUSTOM_LIBRARY_PATH/steamapps/common/Shadow of the Tomb Raider Trial"
     )
 
     local game_path=""
@@ -707,37 +697,70 @@ run_bench() {
     done
 
     if [[ -z "$game_path" ]]; then
-        log_to_file error "$log" "Rise of the Tomb Raider not found in any known location:"
+        log_to_file error "$log" "Shadow of the Tomb Raider not found in any known location:"
         for candidate_dir in "${game_dir_candidates[@]}"; do
             log_to_file error "$log" "  - $candidate_dir"
         done
         return 1
     fi
 
-    local -a exe_candidates=(
-        "$game_path/bin/x64/ROTTR_DX12.exe"
-        "$game_path/ROTTR_DX12.exe"
-        "$game_path/bin/x64/ROTTR.exe"
-        "$game_path/ROTTR.exe"
-        "$game_path/bin/x64/TombRaider.exe"
-        "$game_path/TombRaider.exe"
-    )
-
+    local launch_mode="proton"
     local exe_path=""
+
+    # Prefer native Linux binary if available.
+    local -a native_exe_candidates=(
+        "$game_path/ShadowOfTheTombRaider"
+        "$game_path/ShadowOfTheTombRaider.x86_64"
+        "$game_path/bin/ShadowOfTheTombRaider"
+        "$game_path/bin/linux/ShadowOfTheTombRaider"
+    )
     local candidate_exe
-    for candidate_exe in "${exe_candidates[@]}"; do
-        if [[ -f "$candidate_exe" ]]; then
+    for candidate_exe in "${native_exe_candidates[@]}"; do
+        if [[ -x "$candidate_exe" ]]; then
             exe_path="$candidate_exe"
+            launch_mode="native"
             break
         fi
     done
 
-    if [[ -z "$exe_path" ]]; then
-        log_to_file error "$log" "Game executable not found. Checked:"
-        for candidate_exe in "${exe_candidates[@]}"; do
-            log_to_file error "$log" "  - $candidate_exe"
+    local proton_path=""
+    if [[ "$launch_mode" == "proton" ]]; then
+        # Find Proton installation - check Steam root and custom library possible locations
+        proton_path="$STEAM_PATH/compatibilitytools.d/$PROTON_VERSION"
+        if [[ ! -d "$proton_path" ]]; then
+            proton_path="$STEAM_ROOT/compatibilitytools.d/$PROTON_VERSION"
+            if [[ ! -d "$proton_path" ]]; then
+                log_to_file error "$log" "Proton $PROTON_VERSION not found"
+                return 1
+            fi
+        fi
+
+        local -a proton_exe_candidates=(
+            "$game_path/bin/x64/SOTTR_DX12.exe"
+            "$game_path/SOTTR_DX12.exe"
+            "$game_path/bin/x64/SOTTR.exe"
+            "$game_path/SOTTR.exe"
+            "$game_path/bin/x64/ShadowOfTheTombRaider.exe"
+            "$game_path/ShadowOfTheTombRaider.exe"
+        )
+
+        for candidate_exe in "${proton_exe_candidates[@]}"; do
+            if [[ -f "$candidate_exe" ]]; then
+                exe_path="$candidate_exe"
+                break
+            fi
         done
-        return 1
+
+        if [[ -z "$exe_path" ]]; then
+            log_to_file error "$log" "Game executable not found. Checked native and Proton candidates."
+            for candidate_exe in "${native_exe_candidates[@]}"; do
+                log_to_file error "$log" "  - $candidate_exe"
+            done
+            for candidate_exe in "${proton_exe_candidates[@]}"; do
+                log_to_file error "$log" "  - $candidate_exe"
+            done
+            return 1
+        fi
     fi
 
     local -a direct_benchmark_args=(
@@ -747,46 +770,71 @@ run_bench() {
     )
 
     log_to_file info "$log" "Executable selected: $exe_path"
+    log_to_file info "$log" "Launch mode: $launch_mode"
 
     log_to_file info "$log" "=== Running mode=$mode resolution=$res quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation ==="
     
-    # Set up environment
-    export STEAM_COMPAT_DATA_PATH="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
-    export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH"
-
     local -a launch_args
 
     apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
     log_to_file info "$log" "Launch args: ${direct_benchmark_args[*]} ${launch_args[*]}"
 
-    local -a proton_run_cmd
-    proton_run_cmd=("$proton_path/proton")
-
-    if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
-        if command -v gamemoderun >/dev/null 2>&1; then
-            proton_run_cmd=(gamemoderun "${proton_run_cmd[@]}")
-        else
-            log_to_file error "$log" "--gamemode requested but 'gamemoderun' was not found in PATH."
-            return 1
+    local -a full_launch_cmd
+    if [[ "$launch_mode" == "native" ]]; then
+        local -a native_run_cmd=()
+        if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
+            if command -v gamemoderun >/dev/null 2>&1; then
+                native_run_cmd=(gamemoderun)
+            else
+                log_to_file error "$log" "--gamemode requested but 'gamemoderun' was not found in PATH."
+                return 1
+            fi
         fi
-    fi
 
-    local -a full_launch_cmd=(
-        timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
-        env
-        "SteamAppId=${GAME_ID}"
-        "SteamGameId=${GAME_ID}"
-        "PROTON_VERB=waitforexitandrun"
-        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
-        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
-        "STEAM_RUNTIME=1"
-        "PROTON_LOG=1"
-        "VKD3D_FEATURE_LEVEL=12_0"
-        "${proton_run_cmd[@]}" run
-        "$exe_path"
-        "${direct_benchmark_args[@]}"
-        "${launch_args[@]}"
-    )
+        full_launch_cmd=(
+            timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
+            env
+            "SteamAppId=${GAME_ID}"
+            "SteamGameId=${GAME_ID}"
+            "${native_run_cmd[@]}"
+            "$exe_path"
+            "${direct_benchmark_args[@]}"
+            "${launch_args[@]}"
+        )
+    else
+        # Set up compatibility environment for Proton launches
+        export STEAM_COMPAT_DATA_PATH="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
+        export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH"
+
+        local -a proton_run_cmd
+        proton_run_cmd=("$proton_path/proton")
+
+        if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
+            if command -v gamemoderun >/dev/null 2>&1; then
+                proton_run_cmd=(gamemoderun "${proton_run_cmd[@]}")
+            else
+                log_to_file error "$log" "--gamemode requested but 'gamemoderun' was not found in PATH."
+                return 1
+            fi
+        fi
+
+        full_launch_cmd=(
+            timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
+            env
+            "SteamAppId=${GAME_ID}"
+            "SteamGameId=${GAME_ID}"
+            "PROTON_VERB=waitforexitandrun"
+            "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
+            "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
+            "STEAM_RUNTIME=1"
+            "PROTON_LOG=1"
+            "VKD3D_FEATURE_LEVEL=12_0"
+            "${proton_run_cmd[@]}" run
+            "$exe_path"
+            "${direct_benchmark_args[@]}"
+            "${launch_args[@]}"
+        )
+    fi
 
     local full_launch_cmd_pretty=""
     printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
@@ -808,12 +856,14 @@ run_bench() {
         log_to_file warning "$log" "Benchmark timed out after ${BENCHMARK_TIMEOUT_SECONDS}s (mode=$mode)."
     fi
 
-    env \
-        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
-        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
-        "$proton_path/proton" run wineserver -k >>"$log" 2>&1 || true
+    if [[ "$launch_mode" == "proton" ]]; then
+        env \
+            "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
+            "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
+            "$proton_path/proton" run wineserver -k >>"$log" 2>&1 || true
 
-    pkill -f "ROTTR.exe|ROTTR_DX12.exe|TombRaider.exe|TombRaiderLauncher.exe|CrashReporter" >/dev/null 2>&1 || true
+        pkill -f "SOTTR.exe|SOTTR_DX12.exe|TombRaider.exe|TombRaiderLauncher.exe|CrashReporter" >/dev/null 2>&1 || true
+    fi
 
     if [[ $exit_code -eq 0 ]]; then
         log_to_file success "$log" "Benchmark completed successfully for $mode"
@@ -917,8 +967,8 @@ main() {
     mkdir -p "${SCRIPT_DIR}/logs"
 
     # Create log file
-    local logfile="${SCRIPT_DIR}/logs/rottr_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
-    echo "Rise of the Tomb Raider Upscaling Benchmark – $(date)" >"$logfile"
+    local logfile="${SCRIPT_DIR}/logs/sottr_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
+    echo "Shadow of the Tomb Raider Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
     echo "GPU Metadata: $GPU_METADATA_TAG" >>"$logfile"

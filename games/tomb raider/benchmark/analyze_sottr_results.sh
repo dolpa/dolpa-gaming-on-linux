@@ -10,21 +10,21 @@ SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; 
 if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
 	SYSTEM_NAME_DEFAULT="default"
 fi
-SYSTEM_NAME="${ROTTR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${SOTTR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
 SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
-SYSTEM_CONFIG_OVERRIDE_FILE="${ROTTR_BENCHMARK_CONFIG:-}"
-ROTTR_PROTON_VERSION_DEFAULT="GE-Proton9-27"
+SYSTEM_CONFIG_OVERRIDE_FILE="${SOTTR_BENCHMARK_CONFIG:-}"
+SOTTR_PROTON_VERSION_DEFAULT="GE-Proton9-27"
 
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
 GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
-TEMPLATE_FILE="${RESULTS_DIR}/rottr_benchmark_report_template.md"
-LATEST_REPORT_FILE="${RESULTS_DIR}/rottr_benchmark_report.md"
-TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/rottr_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
+TEMPLATE_FILE="${RESULTS_DIR}/sottr_benchmark_report_template.md"
+LATEST_REPORT_FILE="${RESULTS_DIR}/sottr_benchmark_report.md"
+TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/sottr_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
 BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
 GAME_README_FILE="${SCRIPT_DIR}/../README.md"
 TEST_RESULTS_START_MARKER="<!-- TEST_RESULTS_START -->"
@@ -38,7 +38,7 @@ fi
 
 if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
 	if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
-		echo "Error: ROTTR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+		echo "Error: SOTTR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
 		exit 1
 	fi
 	# shellcheck source=/dev/null
@@ -46,10 +46,10 @@ if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
 fi
 
 # Proton selection precedence:
-# 1) ROTTR_PROTON_VERSION (game-specific override)
-# 2) PROTON_VERSION (shared system default)
-# 3) ROTTR_PROTON_VERSION_DEFAULT (game fallback)
-PROTON_VERSION="${ROTTR_PROTON_VERSION:-${PROTON_VERSION:-$ROTTR_PROTON_VERSION_DEFAULT}}"
+# 1) SOTTR_PROTON_VERSION (game-specific override)
+# 2) SOTTR_PROTON_VERSION_DEFAULT (game default)
+# 3) PROTON_VERSION (shared system default)
+PROTON_VERSION="${SOTTR_PROTON_VERSION:-${SOTTR_PROTON_VERSION_DEFAULT:-${PROTON_VERSION:-}}}"
 
 REPORT_SYSTEM_OS="${REPORT_SYSTEM_OS:-Ubuntu 24.04.4 LTS}"
 REPORT_SYSTEM_KERNEL="${REPORT_SYSTEM_KERNEL:-6.17.0-14-generic}"
@@ -381,10 +381,10 @@ ensure_test_results_section_exists() {
 		echo
 		echo "Latest report files:"
 		echo
-		echo "- [benchmark/results/rottr_benchmark_report_template.md](benchmark/results/rottr_benchmark_report_template.md)"
-		echo "- [benchmark/results/rottr_benchmark_report.md](benchmark/results/rottr_benchmark_report.md)"
+		echo "- [benchmark/results/sottr_benchmark_report_template.md](benchmark/results/sottr_benchmark_report_template.md)"
+		echo "- [benchmark/results/sottr_benchmark_report.md](benchmark/results/sottr_benchmark_report.md)"
 		echo
-		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_rottr_results.sh\\`):"
+		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_sottr_results.sh\\`):"
 		echo
 		echo "$TEST_RESULTS_START_MARKER"
 		echo "$TEST_RESULTS_PLACEHOLDER"
@@ -447,7 +447,7 @@ register_all_snapshot_report_links_in_readme() {
 	local -a sorted_snapshot_files
 	local -A seen_snapshot_basenames=()
 	shopt -s nullglob
-	snapshot_files=("${RESULTS_DIR}"/rottr_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
+	snapshot_files=("${RESULTS_DIR}"/sottr_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
 	shopt -u nullglob
 
 	local links_file
