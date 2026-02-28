@@ -4,4 +4,4 @@ games/cyberpunk 2077/benchmark/vkd3d-proton.cache.write
 games/cyberpunk 2077/benchmark/logs/cyberpunk_benchmark_*_*.txt
 games/cyberpunk 2077/benchmark/results/1091500_result_*.json
 src/__pycache__/convert_markdown_reports.cpython-312.pyc
-games/tomb raider/benchmark/logs/tr_benchmark_*_*.txt
+games/tomb raider/benchmark/logs/rottr_benchmark_*_*.txt
