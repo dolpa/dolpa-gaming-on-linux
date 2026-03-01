@@ -24,8 +24,12 @@ CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
-TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
-GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
+TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+TESTS_CONFIG_NATIVE_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+TESTS_CONFIG_PROTON_FILE="${SCRIPT_DIR}/config/tests.proton.conf.sh"
+GROUPS_CONFIG_NATIVE_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+GROUPS_CONFIG_PROTON_FILE="${SCRIPT_DIR}/config/groups.proton.conf.sh"
 TEMPLATE_FILE="${RESULTS_DIR}/sottr_benchmark_report_template.md"
 LATEST_REPORT_FILE="${RESULTS_DIR}/sottr_benchmark_report.md"
 TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/sottr_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
@@ -93,12 +97,20 @@ fi
 # shellcheck source=/dev/null
 source "$BASH_UTILS_LOADER"
 
-if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
+if [[ -f "$TESTS_CONFIG_NATIVE_FILE" ]]; then
+	TESTS_CONFIG_FILE="$TESTS_CONFIG_NATIVE_FILE"
+elif [[ -f "$LEGACY_TESTS_CONFIG_FILE" ]]; then
+	TESTS_CONFIG_FILE="$LEGACY_TESTS_CONFIG_FILE"
+elif [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
 	log_error "Tests config file not found: $TESTS_CONFIG_FILE"
 	exit 1
 fi
 
-if [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
+if [[ -f "$GROUPS_CONFIG_NATIVE_FILE" ]]; then
+	GROUPS_CONFIG_FILE="$GROUPS_CONFIG_NATIVE_FILE"
+elif [[ -f "$LEGACY_GROUPS_CONFIG_FILE" ]]; then
+	GROUPS_CONFIG_FILE="$LEGACY_GROUPS_CONFIG_FILE"
+elif [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
 	log_error "Test groups config file not found: $GROUPS_CONFIG_FILE"
 	exit 1
 fi
@@ -117,6 +129,16 @@ source "$TESTS_CONFIG_FILE"
 # shellcheck source=/dev/null
 source "$GROUPS_CONFIG_FILE"
 
+if [[ -f "$TESTS_CONFIG_PROTON_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$TESTS_CONFIG_PROTON_FILE"
+fi
+
+if [[ -f "$GROUPS_CONFIG_PROTON_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$GROUPS_CONFIG_PROTON_FILE"
+fi
+
 show_help() {
 	echo "Tomb Raider Benchmark Results Analyzer"
 	echo "Usage: $0 [OPTIONS] [TEST_NAME ...]"
@@ -134,8 +156,9 @@ show_help() {
 	echo
 	echo "Examples:"
 	echo "  $0"
-	echo "  $0 --group quick-4k"
-	echo "  $0 --group quick-4k dlss-quality-4k-high-rt-on"
+	echo "  $0 --group native-quick"
+	echo "  $0 --group proton-quick"
+	echo "  $0 --group native-4k-scaling native-4k-high-rt-off"
 }
 
 list_tests() {
@@ -574,81 +597,7 @@ register_all_snapshot_report_links_in_readme() {
 	log_success "Synchronized snapshot report links in README (newest first, no duplicates)."
 }
 
-build_quick_resolution_variant_groups() {
-	add_test_and_rt_pair_if_available() {
-		local target_array_name="$1"
-		local mapped_test_name="$2"
-
-		if [[ -z "${TESTS[$mapped_test_name]+isset}" ]]; then
-			return
-		fi
-
-		eval "$target_array_name+=(\"$mapped_test_name\")"
-
-		local counterpart_test_name=""
-		if [[ "$mapped_test_name" == *-rt-off* ]]; then
-			counterpart_test_name="${mapped_test_name/-rt-off/-rt-on}"
-		elif [[ "$mapped_test_name" == *-rt-on* ]]; then
-			counterpart_test_name="${mapped_test_name/-rt-on/-rt-off}"
-		fi
-
-		if [[ -n "$counterpart_test_name" && -n "${TESTS[$counterpart_test_name]+isset}" ]]; then
-			eval "$target_array_name+=(\"$counterpart_test_name\")"
-		fi
-	}
-
-	local source_group_name
-	for source_group_name in "${!TEST_GROUPS[@]}"; do
-		[[ "$source_group_name" == 4k-quick-* ]] || continue
-
-		local group_suffix="${source_group_name#4k-quick-}"
-		local target_group_1080p="1080p-quick-${group_suffix}"
-		local target_group_1440p="1440p-quick-${group_suffix}"
-
-		read -ra source_tests <<<"${TEST_GROUPS[$source_group_name]}"
-
-		local -a mapped_1080p_tests=()
-		local -a mapped_1440p_tests=()
-		local -A seen_1080p_tests=()
-		local -A seen_1440p_tests=()
-		local source_test mapped_test
-
-		for source_test in "${source_tests[@]}"; do
-			mapped_test="${source_test//-4k-/-1080p-}"
-			add_test_and_rt_pair_if_available "mapped_1080p_tests" "$mapped_test"
-
-			mapped_test="${source_test//-4k-/-1440p-}"
-			add_test_and_rt_pair_if_available "mapped_1440p_tests" "$mapped_test"
-		done
-
-		local -a deduped_1080p_tests=()
-		for mapped_test in "${mapped_1080p_tests[@]}"; do
-			if [[ -z "${seen_1080p_tests[$mapped_test]+isset}" ]]; then
-				deduped_1080p_tests+=("$mapped_test")
-				seen_1080p_tests["$mapped_test"]=1
-			fi
-		done
-
-		local -a deduped_1440p_tests=()
-		for mapped_test in "${mapped_1440p_tests[@]}"; do
-			if [[ -z "${seen_1440p_tests[$mapped_test]+isset}" ]]; then
-				deduped_1440p_tests+=("$mapped_test")
-				seen_1440p_tests["$mapped_test"]=1
-			fi
-		done
-
-		if [[ ${#deduped_1080p_tests[@]} -gt 0 ]]; then
-			TEST_GROUPS["$target_group_1080p"]="${deduped_1080p_tests[*]}"
-		fi
-
-		if [[ ${#deduped_1440p_tests[@]} -gt 0 ]]; then
-			TEST_GROUPS["$target_group_1440p"]="${deduped_1440p_tests[*]}"
-		fi
-	done
-}
-
 augment_tests_with_fg_variants
-build_quick_resolution_variant_groups
 parse_arguments "$@"
 select_tests_for_report
 

@@ -13,10 +13,14 @@ Benchmark automation and profile management for Shadow of the Tomb Raider on Lin
   - Builds markdown reports from copied benchmark result files.
   - Supports filtering by test and/or group.
   - Adds GPU model / VRAM / driver columns to report rows.
-- `benchmark/config/tests.conf.sh`
+- `benchmark/config/tests.native.conf.sh`
   - Base test catalog (non-generated test definitions).
-- `benchmark/config/groups.conf.sh`
+- `benchmark/config/groups.native.conf.sh`
   - Base predefined groups.
+- `benchmark/config/tests.proton.conf.sh`
+  - Proton-mode test catalog (DX12 on/off + DLSS Ultra Performance presets).
+- `benchmark/config/groups.proton.conf.sh`
+  - Proton-mode predefined groups.
 - `benchmark/profiles/`
   - Contains one native preferences XML per test name.
 - `benchmark/results/`
@@ -39,7 +43,7 @@ If you specifically want DLSS/RT/FG testing, run the Windows build via Proton an
 
 Tests come directly from:
 
-- `benchmark/config/tests.conf.sh`
+- `benchmark/config/tests.native.conf.sh`
 
 Current scope is native-only and includes 12 tests:
 
@@ -61,7 +65,7 @@ Examples:
 
 Groups are defined in:
 
-- `benchmark/config/groups.conf.sh`
+- `benchmark/config/groups.native.conf.sh`
 
 Key groups:
 
@@ -76,7 +80,7 @@ Key groups:
 
 For each test:
 
-1. Script selects test parameters from `tests.conf.sh`.
+1. Script selects test parameters from `tests.native.conf.sh`.
 2. For native runs, script copies:
    - `benchmark/profiles/{TEST_NAME}.preferences.xml`
    - into live file:
@@ -92,6 +96,52 @@ Notes:
 
 - `SCRIPT_RUN_TIMESTAMP` is generated once per run and reused for all tests in that run.
 - GPU fields are normalized/sanitized for safe filenames.
+
+## Launch mode options (native or Proton)
+
+The benchmark runner supports two explicit launch modes:
+
+- `native` (default)
+  - Uses native Linux executable when available.
+  - If native binary is missing, falls back to Proton automatically.
+- `proton`
+  - Forces Windows executable launch through Proton.
+
+Control launch mode using either CLI flags or environment variables:
+
+- CLI flags:
+  - `--native`
+  - `--proton`
+- Environment variables:
+  - `SOTTR_LAUNCH_MODE=native|proton`
+  - `SOTTR_PROTON_VERSION=<version>`
+  - `SOTTR_PROTON_VERSION_DEFAULT=<version>`
+
+Proton selection precedence:
+
+1. `SOTTR_PROTON_VERSION`
+2. `PROTON_VERSION`
+3. `SOTTR_PROTON_VERSION_DEFAULT`
+
+### Steam Compatibility setting (important)
+
+Before switching between native and Proton runs, update the game setting in Steam:
+
+1. Steam Library → right click **Shadow of the Tomb Raider** → **Properties** → **Compatibility**.
+2. Then apply one of these modes:
+
+- Native benchmark run (`--native`)
+  - **Uncheck**: `Force the use of a specific Steam Play compatibility tool`
+- Proton benchmark run (`--proton`)
+  - **Check**: `Force the use of a specific Steam Play compatibility tool`
+  - Select the same Proton build you use in script/env (for example `GE-Proton9-27`).
+
+Recommended workflow when changing mode:
+
+- Native session: unset/disable Compatibility force, then run native tests.
+- Proton session: enable Compatibility force and pick Proton tool, then run Proton tests.
+
+This avoids mixing native and Proton runtime state between sessions.
 
 ## System-specific configuration
 
@@ -109,7 +159,7 @@ System name selection:
 
 Example with explicit config file:
 
-- `SOTTR_BENCHMARK_CONFIG="/path/to/my-machine.conf.sh" games/tomb raider/benchmark/run_sottr_benchmark.sh --group quick`
+- `SOTTR_BENCHMARK_CONFIG="/path/to/my-machine.conf.sh" games/tomb raider/benchmark/run_sottr_benchmark.sh --group native-quick`
 
 ## Reporting flow
 
@@ -135,7 +185,9 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_sottr_results.sh`):
 
 <!-- TEST_RESULTS_START -->
+- [sottr_benchmark_report_20260301_230717.md](benchmark/results/sottr_benchmark_report_20260301_230717.md)
 - [sottr_benchmark_report_20260301_141758.md](benchmark/results/sottr_benchmark_report_20260301_141758.md)
+- [sottr_benchmark_report_20260301_140603.md](benchmark/results/sottr_benchmark_report_20260301_140603.md)
 <!-- TEST_RESULTS_END -->
 
 ## Logs and output locations
@@ -171,19 +223,25 @@ From repository root:
 - Run one test:
   - `games/tomb raider/benchmark/run_sottr_benchmark.sh native-1080p-high-rt-off`
 - Run one or more groups:
-  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group quick`
-  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group 1080p-scaling --group 1440p-scaling`
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group native-quick`
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group native-1080p-scaling --group native-1440p-scaling`
+- Force native launch mode:
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --native --group native-quick`
+- Force Proton launch mode:
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --proton --group proton-quick`
+- Force specific Proton version for this run:
+  - `SOTTR_PROTON_VERSION=GE-Proton9-27 games/tomb raider/benchmark/run_sottr_benchmark.sh --proton --group proton-quick`
 - Run all tests:
   - `games/tomb raider/benchmark/run_sottr_benchmark.sh --all`
 - Enable GameMode wrapper:
-  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --gamemode --group quick`
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --gamemode --group native-quick`
 
 Analyze results:
 
 - Analyze all tests:
   - `games/tomb raider/benchmark/analyze_sottr_results.sh`
 - Analyze a group:
-  - `games/tomb raider/benchmark/analyze_sottr_results.sh --group quick`
+  - `games/tomb raider/benchmark/analyze_sottr_results.sh --group native-quick`
 - Analyze specific tests:
   - `games/tomb raider/benchmark/analyze_sottr_results.sh native-1080p-low-rt-off native-4k-high-rt-off`
 

@@ -1,14 +1,10 @@
-# Rise native benchmark profiles
+# Shadow of the Tomb Raider benchmark profiles
 
-Each file in this directory maps one benchmark test name to launch arguments used by `run_rottr_benchmark.sh`.
+Each test now uses one native preferences profile consumed by `run_sottr_benchmark.sh`.
 
-- Filename format: `{TEST_NAME}.profile.conf.sh`
-- Variables consumed by script:
-  - `profile_mode`
-  - `profile_resolution`
-  - `profile_quality`
-  - `profile_ray_tracing`
-  - `profile_frame_generation`
-  - `profile_launch_args` (bash array)
+- Native preferences snapshot format: `{TEST_NAME}.preferences.xml`
+  - Full native Feral `preferences` XML copied into
+    `~/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences`
+    before each native test.
 
-This directory is the preferred format for Rise of the Tomb Raider benchmark profiles.
+All `.preferences.xml` files are consumed directly by `run_sottr_benchmark.sh`.

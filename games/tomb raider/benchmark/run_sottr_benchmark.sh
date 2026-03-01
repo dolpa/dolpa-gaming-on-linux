@@ -19,6 +19,7 @@ SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 SYSTEM_CONFIG_OVERRIDE_FILE="${SOTTR_BENCHMARK_CONFIG:-}"
 SOTTR_PROTON_VERSION_DEFAULT="GE-Proton9-27"
+SOTTR_LAUNCH_MODE_DEFAULT="native"
 
 # Built-in defaults (can be overridden by config files below)
 GAME_ID=750920
@@ -52,9 +53,36 @@ fi
 
 # Proton selection precedence:
 # 1) SOTTR_PROTON_VERSION (game-specific override)
-# 2) SOTTR_PROTON_VERSION_DEFAULT (game default)
-# 3) PROTON_VERSION (shared system default)
-PROTON_VERSION="${SOTTR_PROTON_VERSION:-${SOTTR_PROTON_VERSION_DEFAULT:-${PROTON_VERSION:-}}}"
+# 2) PROTON_VERSION (shared system default)
+# 3) SOTTR_PROTON_VERSION_DEFAULT (game fallback)
+PROTON_VERSION="${SOTTR_PROTON_VERSION:-${PROTON_VERSION:-$SOTTR_PROTON_VERSION_DEFAULT}}"
+
+# Launch mode selection precedence:
+# 1) SOTTR_LAUNCH_MODE (game-specific override)
+# 2) SOTTR_LAUNCH_MODE_DEFAULT (game default)
+SOTTR_LAUNCH_MODE="${SOTTR_LAUNCH_MODE:-$SOTTR_LAUNCH_MODE_DEFAULT}"
+SOTTR_LAUNCH_MODE="${SOTTR_LAUNCH_MODE,,}"
+
+case "$SOTTR_LAUNCH_MODE" in
+    native|proton)
+        ;;
+    *)
+        echo "Error: invalid SOTTR_LAUNCH_MODE '$SOTTR_LAUNCH_MODE'. Supported values: native, proton" >&2
+        exit 1
+        ;;
+esac
+
+INITIAL_LAUNCH_MODE="$SOTTR_LAUNCH_MODE"
+for cli_arg in "$@"; do
+    case "$cli_arg" in
+        --native)
+            INITIAL_LAUNCH_MODE="native"
+            ;;
+        --proton)
+            INITIAL_LAUNCH_MODE="proton"
+            ;;
+    esac
+done
 
 if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
     BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
@@ -91,9 +119,22 @@ source "$BASH_UTILS_LOADER"
 declare -A TESTS
 
 # Load base test definitions from external config
-TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
+if [[ "$INITIAL_LAUNCH_MODE" == "proton" ]]; then
+    TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.proton.conf.sh"
+    if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
+        TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/proton-test.conf.sh"
+    fi
+    if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
+        TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/proton.tests.conf.sh"
+    fi
+else
+    TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+    if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
+        TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
+    fi
+fi
 if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
-    log_error "Tests config file not found: $TESTS_CONFIG_FILE"
+    log_error "Tests config file not found for launch mode '${INITIAL_LAUNCH_MODE}'."
     exit 1
 fi
 # shellcheck source=/dev/null
@@ -134,93 +175,29 @@ done
 # Predefined test groups for common scenarios
 declare -A TEST_GROUPS
 
-TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
+if [[ "$INITIAL_LAUNCH_MODE" == "proton" ]]; then
+    TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.proton.conf.sh"
+    if [[ ! -f "$TEST_GROUPS_CONFIG_FILE" ]]; then
+        TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/proton-groups.conf.sh"
+    fi
+    if [[ ! -f "$TEST_GROUPS_CONFIG_FILE" ]]; then
+        TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/proton.groups.conf.sh"
+    fi
+else
+    TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+    if [[ ! -f "$TEST_GROUPS_CONFIG_FILE" ]]; then
+        TEST_GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
+    fi
+fi
 if [[ ! -f "$TEST_GROUPS_CONFIG_FILE" ]]; then
-    log_error "Test groups config file not found: $TEST_GROUPS_CONFIG_FILE"
+    log_error "Test groups config file not found for launch mode '${INITIAL_LAUNCH_MODE}'."
     exit 1
 fi
 # shellcheck source=/dev/null
 source "$TEST_GROUPS_CONFIG_FILE"
 
-build_quick_resolution_variant_groups() {
-    add_test_and_rt_pair_if_available() {
-        local target_array_name="$1"
-        local mapped_test_name="$2"
-
-        if [[ -z "${TESTS[$mapped_test_name]+isset}" ]]; then
-            return
-        fi
-
-        eval "$target_array_name+=(\"$mapped_test_name\")"
-
-        local counterpart_test_name=""
-        if [[ "$mapped_test_name" == *-rt-off* ]]; then
-            counterpart_test_name="${mapped_test_name/-rt-off/-rt-on}"
-        elif [[ "$mapped_test_name" == *-rt-on* ]]; then
-            counterpart_test_name="${mapped_test_name/-rt-on/-rt-off}"
-        fi
-
-        if [[ -n "$counterpart_test_name" && -n "${TESTS[$counterpart_test_name]+isset}" ]]; then
-            eval "$target_array_name+=(\"$counterpart_test_name\")"
-        fi
-    }
-
-    local source_group_name
-    for source_group_name in "${!TEST_GROUPS[@]}"; do
-        [[ "$source_group_name" == 4k-quick-* ]] || continue
-
-        local group_suffix="${source_group_name#4k-quick-}"
-        local target_group_1080p="1080p-quick-${group_suffix}"
-        local target_group_1440p="1440p-quick-${group_suffix}"
-
-        read -ra source_tests <<< "${TEST_GROUPS[$source_group_name]}"
-
-        local -a mapped_1080p_tests=()
-        local -a mapped_1440p_tests=()
-        local -A seen_1080p_tests=()
-        local -A seen_1440p_tests=()
-        local source_test mapped_test
-
-        for source_test in "${source_tests[@]}"; do
-            mapped_test="${source_test//-4k-/-1080p-}"
-            add_test_and_rt_pair_if_available "mapped_1080p_tests" "$mapped_test"
-
-            mapped_test="${source_test//-4k-/-1440p-}"
-            add_test_and_rt_pair_if_available "mapped_1440p_tests" "$mapped_test"
-        done
-
-        local -a deduped_1080p_tests=()
-        for mapped_test in "${mapped_1080p_tests[@]}"; do
-            if [[ -z "${seen_1080p_tests[$mapped_test]+isset}" ]]; then
-                deduped_1080p_tests+=("$mapped_test")
-                seen_1080p_tests["$mapped_test"]=1
-            fi
-        done
-
-        local -a deduped_1440p_tests=()
-        for mapped_test in "${mapped_1440p_tests[@]}"; do
-            if [[ -z "${seen_1440p_tests[$mapped_test]+isset}" ]]; then
-                deduped_1440p_tests+=("$mapped_test")
-                seen_1440p_tests["$mapped_test"]=1
-            fi
-        done
-
-        if [[ ${#deduped_1080p_tests[@]} -gt 0 ]]; then
-            TEST_GROUPS["$target_group_1080p"]="${deduped_1080p_tests[*]}"
-        fi
-
-        if [[ ${#deduped_1440p_tests[@]} -gt 0 ]]; then
-            TEST_GROUPS["$target_group_1440p"]="${deduped_1440p_tests[*]}"
-        fi
-    done
-}
-
 augment_existing_groups_with_fg_variants() {
     for group_name in "${!TEST_GROUPS[@]}"; do
-        if [[ "$group_name" == "quick-4k" || "$group_name" == 4k-quick-* ]]; then
-            continue
-        fi
-
         read -ra group_tests <<< "${TEST_GROUPS[$group_name]}"
 
         local -a updated_group_tests=()
@@ -287,7 +264,6 @@ build_dynamic_groups() {
 }
 
 augment_existing_groups_with_fg_variants
-build_quick_resolution_variant_groups
 build_dynamic_groups
 
 # Function to show help
@@ -302,6 +278,8 @@ show_help() {
     echo "  --groups           List predefined test groups"
     echo "  --group GROUP      Run a predefined test group"
     echo "  --timeout-minutes  MIN  Per-test timeout in minutes (default: 15)"
+    echo "  --native           Force native Linux launch mode (default)"
+    echo "  --proton           Force Proton launch mode"
     echo "  --gamemode         Run game launch through gamemoderun"
     echo "  --validate-profiles Check whether profile files exist for tests"
     echo ""
@@ -310,22 +288,72 @@ show_help() {
     echo "  2) SOTTR_BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)"
     echo ""
     echo "System selection override:"
-    echo "  SOTTR_SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
+    echo "  SOTTR_SYSTEM_NAME=MY_MACHINE $0 --group native-quick"
+    echo ""
+    echo "Launch mode override:"
+    echo "  SOTTR_LAUNCH_MODE=native $0 --group native-quick"
+    echo "  SOTTR_LAUNCH_MODE=proton $0 --group proton-quick"
+    echo "  SOTTR_PROTON_VERSION=GE-Proton9-27 $0 --proton --group proton-quick"
     echo ""
     echo "TESTS:"
     echo "  If no test names are specified, runs default test (native-1080p-low-rt-off)"
     echo "  Multiple test names can be specified to run them sequentially"
     echo ""
-    echo "TEST GROUPS:"
+    echo "TEST GROUPS (active launch mode: ${INITIAL_LAUNCH_MODE}):"
     for group_name in "${!TEST_GROUPS[@]}"; do
         echo "  $group_name: ${TEST_GROUPS[$group_name]}"
     done | sort
     echo ""
-    echo "Available tests:"
+    echo "Available tests (active launch mode: ${INITIAL_LAUNCH_MODE}):"
     for test_name in "${!TESTS[@]}"; do
         local params=(${TESTS[$test_name]})
-        printf "  %-25s %s %s %s RT:%s FG:%s\n" "$test_name" "${params[0]}" "${params[1]}" "${params[2]}" "${params[3]}" "${params[4]}"
+        local dx12_mode_display="${params[5]:-on}"
+        printf "  %-25s %s %s %s RT:%s FG:%s DX12:%s\n" "$test_name" "${params[0]}" "${params[1]}" "${params[2]}" "${params[3]}" "${params[4]}" "$dx12_mode_display"
     done | sort
+    echo ""
+
+    local proton_tests_config="${SCRIPT_DIR}/config/tests.proton.conf.sh"
+    if [[ ! -f "$proton_tests_config" ]]; then
+        proton_tests_config="${SCRIPT_DIR}/config/proton-test.conf.sh"
+    fi
+    if [[ ! -f "$proton_tests_config" ]]; then
+        proton_tests_config="${SCRIPT_DIR}/config/proton.tests.conf.sh"
+    fi
+
+    local proton_groups_config="${SCRIPT_DIR}/config/groups.proton.conf.sh"
+    if [[ ! -f "$proton_groups_config" ]]; then
+        proton_groups_config="${SCRIPT_DIR}/config/proton-groups.conf.sh"
+    fi
+    if [[ ! -f "$proton_groups_config" ]]; then
+        proton_groups_config="${SCRIPT_DIR}/config/proton.groups.conf.sh"
+    fi
+
+    if [[ "$INITIAL_LAUNCH_MODE" != "proton" && -f "$proton_tests_config" && -f "$proton_groups_config" ]]; then
+        echo "Proton test groups (catalog):"
+        (
+            declare -A TEST_GROUPS=()
+            # shellcheck source=/dev/null
+            source "$proton_groups_config"
+            for group_name in "${!TEST_GROUPS[@]}"; do
+                echo "  $group_name: ${TEST_GROUPS[$group_name]}"
+            done | sort
+        )
+        echo ""
+
+        echo "Proton tests (catalog):"
+        (
+            declare -A TESTS=()
+            # shellcheck source=/dev/null
+            source "$proton_tests_config"
+            for test_name in "${!TESTS[@]}"; do
+                local params=(${TESTS[$test_name]})
+                local dx12_mode_display="${params[5]:-on}"
+                printf "  %-25s %s %s %s RT:%s FG:%s DX12:%s\n" "$test_name" "${params[0]}" "${params[1]}" "${params[2]}" "${params[3]}" "${params[4]}" "$dx12_mode_display"
+            done | sort
+        )
+        echo ""
+    fi
+
     echo ""
     echo "Examples:"
     echo "  $0 --help"
@@ -333,36 +361,32 @@ show_help() {
     echo "  $0 --groups"
     echo "  $0 --validate-profiles"
     echo "  $0 --all"
-    echo "  $0 --group quick"
-    echo "  $0 --group quick-4k"
-    echo "  $0 --group 4k-quick-low"
-    echo "  $0 --group 4k-quick-medium"
-    echo "  $0 --group 4k-quick-high"
-    echo "  $0 --group 4k-quick-ultra"
-    echo "  $0 --group 1080p-quick-low"
-    echo "  $0 --group 1080p-quick-medium"
-    echo "  $0 --group 1080p-quick-high"
-    echo "  $0 --group 1080p-quick-ultra"
-    echo "  $0 --group 1440p-quick-low"
-    echo "  $0 --group 1440p-quick-medium"
-    echo "  $0 --group 1440p-quick-high"
-    echo "  $0 --group 1440p-quick-ultra"
-    echo "  $0 --group dlss-comparison"
-    echo "  $0 --gamemode --group quick"
+    echo "  $0 --native --group native-quick"
+    echo "  $0 --proton --group proton-quick"
+    echo "  $0 --group native-quick"
+    echo "  $0 --group native-1080p-scaling"
+    echo "  $0 --group native-1440p-scaling"
+    echo "  $0 --group native-4k-scaling"
+    echo "  $0 --group all-native"
+    echo "  $0 --group all-proton"
+    echo "  $0 --gamemode --group native-quick"
     echo "  $0 native-1080p-high-rt-off"
-    echo "  $0 dlss-quality-1440p-high-rt-on"
-    echo "  $0 fsr3-quality-4k-high-rt-off-fg-dlss"
-    echo "  $0 native-1440p-ultra-rt-on dlss3-quality-1440p-high-rt-on-fg-frs31"
+    echo "  $0 native-1440p-ultra-rt-off native-4k-high-rt-off"
     echo ""
     echo "PROFILE FILES:"
     echo "  Shadow of the Tomb Raider native preferences profile format:"
     echo "    profiles/{TEST_NAME}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
-    echo "  Example: profiles/fsr3-quality-4k-high-rt-off${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+    echo "  Example: profiles/native-4k-high-rt-off${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
     echo ""
 }
 
 validate_profiles() {
     local missing_count=0
+
+    if [[ "$SOTTR_LAUNCH_MODE" == "proton" ]]; then
+        log_info "Launch mode is proton; native preferences profile validation is skipped."
+        return 0
+    fi
 
     if [[ ! -d "$PROFILES_DIR" ]]; then
         log_error "Profiles directory not found: $PROFILES_DIR"
@@ -744,15 +768,16 @@ run_test() {
     local quality="${params[2]}"
     local ray_tracing="${params[3]}"
     local frame_generation="${params[4]}"
+    local directx12_mode="${params[5]:-on}"
     
     if [[ "$test_index" -gt 0 && "$total_tests" -gt 0 ]]; then
         log_to_file info "$logfile" "Running test ($test_index/$total_tests): $test_name"
     else
         log_to_file info "$logfile" "Running test: $test_name"
     fi
-    log_to_file info "$logfile" "Parameters: mode=$mode resolution=$resolution quality=$quality ray_tracing=$ray_tracing frame_generation=$frame_generation"
+    log_to_file info "$logfile" "Parameters: mode=$mode resolution=$resolution quality=$quality ray_tracing=$ray_tracing frame_generation=$frame_generation directx12=$directx12_mode"
     # Apply settings and run benchmark
-    if run_bench "$mode" "$resolution" "$logfile" "$quality" "$ray_tracing" "$frame_generation" "$test_name"; then
+    if run_bench "$mode" "$resolution" "$logfile" "$quality" "$ray_tracing" "$frame_generation" "$test_name" "$directx12_mode"; then
         log_to_file success "$logfile" "$test_name completed successfully"
         return 0
     else
@@ -770,7 +795,17 @@ run_bench() {
     local ray_tracing=${5:-off}         # ray tracing: off, on, psycho
     local frame_generation=${6:-off}    # frame generation: off, on, auto
     local test_name=${7:-""}            # test name for profile matching
+    local directx12_mode=${8:-on}       # directx12 mode (proton): on|off
     local benchmark_started_epoch
+
+    case "$directx12_mode" in
+        on|off)
+            ;;
+        *)
+            log_to_file error "$log" "Unsupported directx12 mode '$directx12_mode'. Supported: on, off"
+            return 1
+            ;;
+    esac
 
     # Find game installation - check multiple possible locations (full + trial)
     local -a game_dir_candidates=(
@@ -799,10 +834,11 @@ run_bench() {
         return 1
     fi
 
+    local requested_launch_mode="${SOTTR_LAUNCH_MODE:-native}"
     local launch_mode="proton"
     local exe_path=""
 
-    # Prefer native Linux binary if available.
+    # Native mode behavior: prefer native Linux binary, then fallback to Proton.
     local -a native_exe_candidates=(
         "$game_path/ShadowOfTheTombRaider"
         "$game_path/ShadowOfTheTombRaider.x86_64"
@@ -810,16 +846,22 @@ run_bench() {
         "$game_path/bin/linux/ShadowOfTheTombRaider"
     )
     local candidate_exe
-    for candidate_exe in "${native_exe_candidates[@]}"; do
-        if [[ -x "$candidate_exe" ]]; then
-            exe_path="$candidate_exe"
-            launch_mode="native"
-            break
-        fi
-    done
+    if [[ "$requested_launch_mode" == "native" ]]; then
+        for candidate_exe in "${native_exe_candidates[@]}"; do
+            if [[ -x "$candidate_exe" ]]; then
+                exe_path="$candidate_exe"
+                launch_mode="native"
+                break
+            fi
+        done
+    fi
 
     local proton_path=""
     if [[ "$launch_mode" == "proton" ]]; then
+        if [[ "$requested_launch_mode" == "native" ]]; then
+            log_to_file warning "$log" "Native executable not found; falling back to Proton launch mode."
+        fi
+
         # Find Proton installation - check Steam root and custom library possible locations
         proton_path="$STEAM_PATH/compatibilitytools.d/$PROTON_VERSION"
         if [[ ! -d "$proton_path" ]]; then
@@ -830,14 +872,26 @@ run_bench() {
             fi
         fi
 
-        local -a proton_exe_candidates=(
-            "$game_path/bin/x64/SOTTR_DX12.exe"
-            "$game_path/SOTTR_DX12.exe"
-            "$game_path/bin/x64/SOTTR.exe"
-            "$game_path/SOTTR.exe"
-            "$game_path/bin/x64/ShadowOfTheTombRaider.exe"
-            "$game_path/ShadowOfTheTombRaider.exe"
-        )
+        local -a proton_exe_candidates=()
+        if [[ "$directx12_mode" == "off" ]]; then
+            proton_exe_candidates=(
+                "$game_path/bin/x64/SOTTR.exe"
+                "$game_path/SOTTR.exe"
+                "$game_path/bin/x64/SOTTR_DX12.exe"
+                "$game_path/SOTTR_DX12.exe"
+                "$game_path/bin/x64/ShadowOfTheTombRaider.exe"
+                "$game_path/ShadowOfTheTombRaider.exe"
+            )
+        else
+            proton_exe_candidates=(
+                "$game_path/bin/x64/SOTTR_DX12.exe"
+                "$game_path/SOTTR_DX12.exe"
+                "$game_path/bin/x64/SOTTR.exe"
+                "$game_path/SOTTR.exe"
+                "$game_path/bin/x64/ShadowOfTheTombRaider.exe"
+                "$game_path/ShadowOfTheTombRaider.exe"
+            )
+        fi
 
         for candidate_exe in "${proton_exe_candidates[@]}"; do
             if [[ -f "$candidate_exe" ]]; then
@@ -865,10 +919,11 @@ run_bench() {
         --non-interactive
     )
 
+    log_to_file info "$log" "Requested launch mode: $requested_launch_mode"
     log_to_file info "$log" "Executable selected: $exe_path"
     log_to_file info "$log" "Launch mode: $launch_mode"
 
-    log_to_file info "$log" "=== Running mode=$mode resolution=$res quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation ==="
+    log_to_file info "$log" "=== Running mode=$mode resolution=$res quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation directx12=$directx12_mode ==="
     
     local -a launch_args
 
@@ -1042,6 +1097,14 @@ main() {
                 BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
                 shift 2
                 ;;
+            --native)
+                SOTTR_LAUNCH_MODE="native"
+                shift
+                ;;
+            --proton)
+                SOTTR_LAUNCH_MODE="proton"
+                shift
+                ;;
             --all)
                 run_all=true
                 shift
@@ -1071,6 +1134,7 @@ main() {
     local logfile="${SCRIPT_DIR}/logs/sottr_benchmark_${SCRIPT_RUN_TIMESTAMP}.txt"
     echo "Shadow of the Tomb Raider Upscaling Benchmark – $(date)" >"$logfile"
     echo "Steam Path: $STEAM_PATH" >>"$logfile"
+    echo "Launch Mode (requested): $SOTTR_LAUNCH_MODE" >>"$logfile"
     echo "Proton Version: $PROTON_VERSION" >>"$logfile"
     echo "GPU Metadata: $GPU_METADATA_TAG" >>"$logfile"
     echo "Per-test timeout: ${BENCHMARK_TIMEOUT_MINUTES} minute(s) (${BENCHMARK_TIMEOUT_SECONDS}s)" >>"$logfile"
