@@ -23,6 +23,7 @@ CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
 
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
+NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
 TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
 GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
 TEMPLATE_FILE="${RESULTS_DIR}/sottr_benchmark_report_template.md"
@@ -237,7 +238,7 @@ augment_tests_with_fg_variants() {
 
 		for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
 			local fg_test_name="${base_test_name}-${fg_suffix}"
-			local fg_profile_file_rise="${PROFILES_DIR}/${fg_test_name}.profile.conf.sh"
+			local fg_profile_file_rise="${PROFILES_DIR}/${fg_test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
 
 			if [[ -f "$fg_profile_file_rise" && -z "${TESTS[$fg_test_name]+isset}" ]]; then
 				read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$base_test_name]}"
