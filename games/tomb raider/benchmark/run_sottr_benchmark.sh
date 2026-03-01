@@ -468,6 +468,7 @@ detect_gpu_metadata() {
 copy_benchmark_result_file() {
     local test_name="$1"
     local log="$2"
+    local search_since_epoch="${3:-0}"
     local output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
     local -a source_dir_candidates=(
         "$BENCHMARK_RESULTS_SOURCE_DIR"
@@ -503,8 +504,19 @@ copy_benchmark_result_file() {
     latest_summary_json="$(
         for candidate_dir in "${existing_source_dirs[@]}"; do
             find "$candidate_dir" -type f -path '*/benchmark_*/summary.json' -printf '%T@ %p\n' 2>/dev/null
-        done | sort -nr | head -n1 | cut -d' ' -f2-
+        done | awk -v since="$search_since_epoch" 'since <= 0 || $1 >= since' | sort -nr | head -n1 | cut -d' ' -f2-
     )"
+
+    if [[ -z "$latest_summary_json" && "$search_since_epoch" -gt 0 ]]; then
+        latest_summary_json="$(
+            for candidate_dir in "${existing_source_dirs[@]}"; do
+                find "$candidate_dir" -type f -path '*/benchmark_*/summary.json' -printf '%T@ %p\n' 2>/dev/null
+            done | sort -nr | head -n1 | cut -d' ' -f2-
+        )"
+        if [[ -n "$latest_summary_json" ]]; then
+            log_to_file warning "$log" "No fresh summary.json found since epoch ${search_since_epoch}; falling back to latest available file."
+        fi
+    fi
 
     if [[ -n "$latest_summary_json" && -f "$latest_summary_json" ]]; then
         if cp "$latest_summary_json" "$destination_file"; then
@@ -520,8 +532,19 @@ copy_benchmark_result_file() {
     latest_native_txt="$(
         for candidate_dir in "${existing_source_dirs[@]}"; do
             find "$candidate_dir" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
-        done | sort -nr | head -n1 | cut -d' ' -f2-
+        done | awk -v since="$search_since_epoch" 'since <= 0 || $1 >= since' | sort -nr | head -n1 | cut -d' ' -f2-
     )"
+
+    if [[ -z "$latest_native_txt" && "$search_since_epoch" -gt 0 ]]; then
+        latest_native_txt="$(
+            for candidate_dir in "${existing_source_dirs[@]}"; do
+                find "$candidate_dir" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
+            done | sort -nr | head -n1 | cut -d' ' -f2-
+        )"
+        if [[ -n "$latest_native_txt" ]]; then
+            log_to_file warning "$log" "No fresh native summary TXT found since epoch ${search_since_epoch}; falling back to latest available file."
+        fi
+    fi
 
     if [[ -z "$latest_native_txt" || ! -f "$latest_native_txt" ]]; then
         log_to_file warning "$log" "No benchmark summary artifact found (JSON or native TXT). Checked: ${existing_source_dirs[*]}"
@@ -747,6 +770,7 @@ run_bench() {
     local ray_tracing=${5:-off}         # ray tracing: off, on, psycho
     local frame_generation=${6:-off}    # frame generation: off, on, auto
     local test_name=${7:-""}            # test name for profile matching
+    local benchmark_started_epoch
 
     # Find game installation - check multiple possible locations (full + trial)
     local -a game_dir_candidates=(
@@ -921,6 +945,8 @@ run_bench() {
         return 1
     fi
 
+    benchmark_started_epoch="$(date +%s)"
+
     (
         cd "$game_path" || exit 1
         "${full_launch_cmd[@]}"
@@ -947,9 +973,9 @@ run_bench() {
     fi
 
     if [[ -n "$test_name" ]]; then
-        copy_benchmark_result_file "$test_name" "$log"
+        copy_benchmark_result_file "$test_name" "$log" "$benchmark_started_epoch"
     else
-        copy_benchmark_result_file "manual-${mode}-${res}" "$log"
+        copy_benchmark_result_file "manual-${mode}-${res}" "$log" "$benchmark_started_epoch"
     fi
     
     sleep 15   # give the game time to close cleanly
