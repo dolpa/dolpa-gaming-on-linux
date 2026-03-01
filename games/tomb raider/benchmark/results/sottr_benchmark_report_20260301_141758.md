@@ -118,3 +118,11 @@
 | fsr2-performance-4k-ultra-rt-on | fsr2-performance | 3840x2160 | ultra | on | off | unknown-gpu | unknown-vram | unknown-driver | 0.00 | 26.70 | 50.50 |
 | fsr3-performance-4k-ultra-rt-off | fsr3-performance | 3840x2160 | ultra | off | off | unknown-gpu | unknown-vram | unknown-driver | 0.00 | 26.20 | 61.10 |
 | fsr3-performance-4k-ultra-rt-on | fsr3-performance | 3840x2160 | ultra | on | off | unknown-gpu | unknown-vram | unknown-driver | 0.00 | 29.80 | 63.90 |
+
+## Graphical Results
+
+![Average FPS chart](./sottr_benchmark_report_20260301_141758_avg_fps_1920x1080.png)
+
+![Average FPS chart](./sottr_benchmark_report_20260301_141758_avg_fps_2560x1440.png)
+
+![Average FPS chart](./sottr_benchmark_report_20260301_141758_avg_fps_3840x2160.png)
