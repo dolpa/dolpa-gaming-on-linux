@@ -32,6 +32,8 @@ BENCHMARK_TIMEOUT_SECONDS=""
 BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30
 BENCHMARK_RESULTS_SOURCE_DIR=""
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"
+NATIVE_PREFERENCES_FILE="${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences"
+NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 
 if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
@@ -97,7 +99,7 @@ fi
 # shellcheck source=/dev/null
 source "$TESTS_CONFIG_FILE"
 
-# Auto-add Frame Generation test variants for all base tests that have matching FG profiles.
+# Auto-add Frame Generation test variants for all base tests that have matching native preferences profiles.
 # Supported suffixes:
 #   -fg-dlss  => DLSS frame generation profile
 #   -fg-frs31 => AMD FSR 3.1 frame generation profile
@@ -110,9 +112,9 @@ for base_test_name in "${!TESTS[@]}"; do
 
     for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
         fg_test_name="${base_test_name}-${fg_suffix}"
-        fg_profile_file_sottr="${PROFILES_DIR}/${fg_test_name}.profile.conf.sh"
+        fg_preferences_file_sottr="${PROFILES_DIR}/${fg_test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
 
-        if [[ -f "$fg_profile_file_sottr" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
+        if [[ -f "$fg_preferences_file_sottr" && ! "${TESTS[$fg_test_name]+isset}" ]]; then
             read -r mode resolution quality ray_tracing frame_generation <<< "${TESTS[$base_test_name]}"
             case "$fg_suffix" in
                 fg-dlss)
@@ -353,9 +355,9 @@ show_help() {
     echo "  $0 native-1440p-ultra-rt-on dlss3-quality-1440p-high-rt-on-fg-frs31"
     echo ""
     echo "PROFILE FILES:"
-    echo "  Shadow of the Tomb Raider profile format:"
-    echo "    profiles/{TEST_NAME}.profile.conf.sh"
-    echo "  Example: profiles/fsr3-quality-4k-high-rt-off.profile.conf.sh"
+    echo "  Shadow of the Tomb Raider native preferences profile format:"
+    echo "    profiles/{TEST_NAME}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+    echo "  Example: profiles/fsr3-quality-4k-high-rt-off${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
     echo ""
 }
 
@@ -369,19 +371,19 @@ validate_profiles() {
 
     log_info "Validating profile files in $PROFILES_DIR ..."
     for test_name in "${!TESTS[@]}"; do
-        local profile_file_sottr="${PROFILES_DIR}/${test_name}.profile.conf.sh"
-        if [[ ! -f "$profile_file_sottr" ]]; then
-            log_warning "Missing: ${test_name}.profile.conf.sh"
+        local native_preferences_profile_file="${PROFILES_DIR}/${test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+        if [[ ! -f "$native_preferences_profile_file" ]]; then
+            log_warning "Missing: ${test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
             missing_count=$((missing_count + 1))
         fi
     done
 
     if [[ $missing_count -eq 0 ]]; then
-        log_success "Profile validation passed: all test profiles exist."
+        log_success "Profile validation passed: all native preferences profiles exist."
         return 0
     fi
 
-    log_error "Profile validation failed: ${missing_count} missing profile file(s)."
+    log_error "Profile validation failed: ${missing_count} missing native preferences profile file(s)."
     return 1
 }
 
@@ -466,7 +468,6 @@ detect_gpu_metadata() {
 copy_benchmark_result_file() {
     local test_name="$1"
     local log="$2"
-    local source_dir=""
     local output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
     local -a source_dir_candidates=(
         "$BENCHMARK_RESULTS_SOURCE_DIR"
@@ -483,41 +484,121 @@ copy_benchmark_result_file() {
         SCRIPT_RUN_TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
     fi
 
+    local -a existing_source_dirs=()
     local candidate_dir
     for candidate_dir in "${source_dir_candidates[@]}"; do
         if [[ -n "$candidate_dir" && -d "$candidate_dir" ]]; then
-            source_dir="$candidate_dir"
-            break
+            existing_source_dirs+=("$candidate_dir")
         fi
     done
 
-    if [[ -z "$source_dir" ]]; then
+    if [[ ${#existing_source_dirs[@]} -eq 0 ]]; then
         log_to_file warning "$log" "Benchmark source directory not found. Checked: ${source_dir_candidates[*]}"
         return 0
     fi
 
-    log_to_file info "$log" "Using benchmark source directory: $source_dir"
-
-    local latest_benchmark_dir
-    latest_benchmark_dir="$(find "$source_dir" -mindepth 1 -maxdepth 1 -type d -name "benchmark_*" -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
-
-    if [[ -z "$latest_benchmark_dir" || ! -d "$latest_benchmark_dir" ]]; then
-        log_to_file warning "$log" "No benchmark_* directory found in $source_dir"
-        return 0
-    fi
-
-    local source_file="$latest_benchmark_dir/summary.json"
-    if [[ ! -f "$source_file" ]]; then
-        log_to_file warning "$log" "summary.json not found in latest benchmark directory: $latest_benchmark_dir"
-        return 0
-    fi
-
     local destination_file="$output_dir/${GAME_ID}_result_${test_name}_${GPU_METADATA_TAG}_${SCRIPT_RUN_TIMESTAMP}.json"
-    cp "$source_file" "$destination_file"
-    if [[ $? -eq 0 ]]; then
-        log_to_file success "$log" "Copied benchmark result: $destination_file"
+
+    local latest_summary_json=""
+    latest_summary_json="$(
+        for candidate_dir in "${existing_source_dirs[@]}"; do
+            find "$candidate_dir" -type f -path '*/benchmark_*/summary.json' -printf '%T@ %p\n' 2>/dev/null
+        done | sort -nr | head -n1 | cut -d' ' -f2-
+    )"
+
+    if [[ -n "$latest_summary_json" && -f "$latest_summary_json" ]]; then
+        if cp "$latest_summary_json" "$destination_file"; then
+            log_to_file info "$log" "Using benchmark source file: $latest_summary_json"
+            log_to_file success "$log" "Copied benchmark result: $destination_file"
+            return 0
+        fi
+        log_to_file warning "$log" "Failed to copy benchmark result from $latest_summary_json"
+        return 0
+    fi
+
+    local latest_native_txt=""
+    latest_native_txt="$(
+        for candidate_dir in "${existing_source_dirs[@]}"; do
+            find "$candidate_dir" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
+        done | sort -nr | head -n1 | cut -d' ' -f2-
+    )"
+
+    if [[ -z "$latest_native_txt" || ! -f "$latest_native_txt" ]]; then
+        log_to_file warning "$log" "No benchmark summary artifact found (JSON or native TXT). Checked: ${existing_source_dirs[*]}"
+        return 0
+    fi
+
+    local benchmark_text_stream
+    if command -v strings >/dev/null 2>&1; then
+        benchmark_text_stream="$(strings -a "$latest_native_txt")"
     else
-        log_to_file warning "$log" "Failed to copy benchmark result from $source_file"
+        benchmark_text_stream="$(tr -cd '\11\12\15\40-\176' < "$latest_native_txt")"
+    fi
+
+    local min_fps max_fps avg_fps
+    min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Min FPS:/{print $3; exit}')"
+    max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Max FPS:/{print $3; exit}')"
+    avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Average FPS:/{print $3; exit}')"
+
+    if [[ -z "$min_fps" || -z "$max_fps" || -z "$avg_fps" ]]; then
+        min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Min FPS:/{print $3; exit}')"
+        max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Max FPS:/{print $3; exit}')"
+        avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average FPS:/{print $3; exit}')"
+    fi
+
+    if [[ -z "$min_fps" || -z "$max_fps" || -z "$avg_fps" ]]; then
+        log_to_file warning "$log" "Failed to parse FPS values from native benchmark TXT: $latest_native_txt"
+        return 0
+    fi
+
+    cat > "$destination_file" <<EOF
+{
+  "Data": {
+    "minFps": $min_fps,
+    "averageFps": $avg_fps,
+    "maxFps": $max_fps
+  },
+  "Source": {
+    "format": "native-benchmark-txt",
+    "file": "$(basename "$latest_native_txt")"
+  }
+}
+EOF
+
+    if [[ $? -eq 0 ]]; then
+        log_to_file info "$log" "Using native benchmark TXT source: $latest_native_txt"
+        log_to_file success "$log" "Converted native benchmark TXT to JSON result: $destination_file"
+    else
+        log_to_file warning "$log" "Failed to write converted benchmark result JSON: $destination_file"
+    fi
+}
+
+apply_native_preferences_profile() {
+    local test_name="$1"
+    local log="$2"
+    local preferences_file="${NATIVE_PREFERENCES_FILE:-}"
+
+    if [[ -z "$test_name" ]]; then
+        log_to_file warning "$log" "No test name provided, skipping native preferences profile copy."
+        return 0
+    fi
+
+    if [[ -z "$preferences_file" ]]; then
+        log_to_file warning "$log" "NATIVE_PREFERENCES_FILE is not set; skipping native preferences profile copy."
+        return 0
+    fi
+
+    local source_preferences_profile="${PROFILES_DIR}/${test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+    if [[ ! -f "$source_preferences_profile" ]]; then
+        log_to_file warning "$log" "Native preferences profile not found: $source_preferences_profile"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$preferences_file")"
+    if cp "$source_preferences_profile" "$preferences_file"; then
+        log_to_file info "$log" "Copied native preferences profile: $source_preferences_profile -> $preferences_file"
+    else
+        log_to_file warning "$log" "Failed to copy native preferences profile: $source_preferences_profile"
     fi
 }
 
@@ -612,40 +693,12 @@ apply_setting() {
     # Default launch arguments for Shadow of the Tomb Raider benchmark
     launch_args_ref=(--resolution "$resolution")
 
-    local sottr_profile=""
-    if [[ -n "$test_name" ]]; then
-        sottr_profile="${PROFILES_DIR}/${test_name}.profile.conf.sh"
-    fi
-
-    if [[ -n "$sottr_profile" && -f "$sottr_profile" ]]; then
-        local profile_mode="$original_mode"
-        local profile_resolution="$resolution"
-        local profile_quality="$quality_preset"
-        local profile_ray_tracing="$ray_tracing"
-        local profile_frame_generation="$frame_generation"
-        local -a profile_launch_args=(--resolution "$resolution")
-
-        # shellcheck source=/dev/null
-        source "$sottr_profile"
-
-        launch_args_ref=("${profile_launch_args[@]}")
-        log_to_file success "$log" "Applied Shadow of the Tomb Raider profile: $sottr_profile"
-    else
-        log_to_file error "$log" "Required profile not found for test '${test_name:-manual}'"
-        if [[ -n "$test_name" ]]; then
-            log_to_file error "$log" "Expected Shadow of the Tomb Raider profile:"
-            log_to_file error "$log" "  - $sottr_profile"
-        else
-            log_to_file error "$log" "Manual mode without test name requires explicit test profile support."
-        fi
-        return 1
-    fi
     # Log the applied settings for reference
     log_to_file info "$log" "Applied settings => mode=$original_mode resolution=$resolution quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation"
     if [[ -n "$test_name" ]]; then
-        log_to_file info "$log" "Profile selection method: test name ($test_name)"
+        log_to_file info "$log" "Native preferences profile key: test name ($test_name)"
     else
-        log_to_file info "$log" "Profile selection method: parameter-based"
+        log_to_file info "$log" "Native preferences profile key: parameter-based"
     fi
     return 0
 }
@@ -796,6 +849,9 @@ run_bench() {
     local -a launch_args
 
     apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
+    if [[ "$launch_mode" == "native" ]]; then
+        apply_native_preferences_profile "$test_name" "$log"
+    fi
     log_to_file info "$log" "Launch args: ${direct_benchmark_args[*]} ${launch_args[*]}"
 
     local -a full_launch_cmd
