@@ -1,4 +1,4 @@
-# Shadow of the Tomb Raider (Linux/Steam Native + Proton Fallback)
+# Shadow of the Tomb Raider (Linux/Steam Native)
 
 Benchmark automation and profile management for Shadow of the Tomb Raider on Linux.
 
@@ -8,9 +8,9 @@ Benchmark automation and profile management for Shadow of the Tomb Raider on Lin
   - Runs predefined benchmark tests/groups via CLI.
   - Uses per-test native preferences snapshots: `profiles/{TEST_NAME}.preferences.xml`.
   - Copies selected preferences snapshot into live native preferences before each native run.
-  - Copies benchmark output JSON into local `benchmark/results/` with run + GPU metadata.
+  - Copies benchmark outputs into local `benchmark/results/` with run + GPU metadata.
 - `benchmark/analyze_sottr_results.sh`
-  - Builds markdown reports from copied benchmark JSON files.
+  - Builds markdown reports from copied benchmark result files.
   - Supports filtering by test and/or group.
   - Adds GPU model / VRAM / driver columns to report rows.
 - `benchmark/config/tests.conf.sh`
@@ -22,47 +22,55 @@ Benchmark automation and profile management for Shadow of the Tomb Raider on Lin
 - `benchmark/results/`
   - Stores copied benchmark result files and generated markdown reports.
 
+## Native Linux feature differences (Feral port)
+
+This benchmark suite is intentionally native Linux focused. For the native Linux port:
+
+- Ray Tracing is not used.
+- DLSS / FSR upscaling modes are not used.
+- Frame Generation is not used.
+- Resolution scaling is handled by native game settings (for example Resolution Modifier), not AI upscalers.
+
+Because of that, this repository now keeps only native profiles and native test groups.
+
+If you specifically want DLSS/RT/FG testing, run the Windows build via Proton and maintain a separate Proton-focused profile set.
+
 ## Available tests and how they work
 
-Tests are built in two layers:
+Tests come directly from:
 
-1. Base tests from:
-   - `benchmark/config/tests.conf.sh`
-2. Auto-generated FG variants at runtime:
-   - For every base test `X`, if `profiles/X-fg-*.preferences.xml` exists, script auto-adds:
-     - `X-fg-dlss`
-     - `X-fg-frs31`
-     - `X-fg` (legacy compatibility)
+- `benchmark/config/tests.conf.sh`
 
-This means `--list` shows:
+Current scope is native-only and includes 12 tests:
 
-- All base tests from `tests.conf.sh`
-- Plus all discovered FG variants that have matching `.preferences.xml` files
+- 1080p: low / medium / high / ultra (`rt-off`)
+- 1440p: low / medium / high / ultra (`rt-off`)
+- 4k: low / medium / high / ultra (`rt-off`)
 
 ### Test naming convention
 
-`{mode}-{resolution}-{quality}-rt-{off|on|psycho}[-fg-dlss|-fg-frs31|-fg]`
+`{mode}-{resolution}-{quality}-rt-off`
 
 Examples:
 
 - `native-1080p-high-rt-off`
-- `dlss-quality-1440p-high-rt-on`
-- `fsr2-performance-4k-low-rt-off`
-- `fsr3-quality-4k-high-rt-off-fg`
+- `native-1440p-medium-rt-off`
+- `native-4k-ultra-rt-off`
 
 ### Test groups
 
-Groups are also built in two layers:
+Groups are defined in:
 
-1. Base groups from:
-   - `benchmark/config/groups.conf.sh`
-2. Runtime augmentation:
-   - Existing groups are expanded with matching `-fg` variants when available.
-   - Resolution quick groups are auto-generated from `4k-quick-*` groups:
-     - `1080p-quick-low|medium|high|ultra`
-     - `1440p-quick-low|medium|high|ultra`
+- `benchmark/config/groups.conf.sh`
 
-So `--groups` always reflects current test coverage.
+Key groups:
+
+- `quick`
+- `native-comparison`
+- `1080p-scaling`
+- `1440p-scaling`
+- `4k-scaling`
+- `all-native`
 
 ## Current benchmark flow
 
@@ -74,10 +82,10 @@ For each test:
    - into live file:
    - `~/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences`
 3. Launches benchmark (native first, Proton fallback when needed).
-4. Finds latest folder matching `benchmark_*` in result source location.
-5. Copies `summary.json` into:
+4. Finds latest benchmark artifacts in result source location.
+5. Copies normalized result artifact(s) into:
    - `benchmark/results/`
-6. Saved result filename format:
+6. Saved JSON result filename format:
    - `${GAME_ID}_result_${test_name}_${gpu_model}_${gpu_vram}_${driver}_${SCRIPT_RUN_TIMESTAMP}.json`
 
 Notes:
@@ -101,11 +109,11 @@ System name selection:
 
 Example with explicit config file:
 
-- `SOTTR_BENCHMARK_CONFIG="/path/to/my-machine.conf.sh" games/tomb raider/benchmark/run_sottr_benchmark.sh --group quick-4k`
+- `SOTTR_BENCHMARK_CONFIG="/path/to/my-machine.conf.sh" games/tomb raider/benchmark/run_sottr_benchmark.sh --group quick`
 
 ## Reporting flow
 
-`analyze_sottr_results.sh` reads benchmark JSON files and generates:
+`analyze_sottr_results.sh` reads copied benchmark result files and generates:
 
 - `benchmark/results/sottr_benchmark_report_template.md`
 - `benchmark/results/sottr_benchmark_report.md`
@@ -163,21 +171,21 @@ From repository root:
 - Run one test:
   - `games/tomb raider/benchmark/run_sottr_benchmark.sh native-1080p-high-rt-off`
 - Run one or more groups:
-  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group quick-4k`
-  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group 1080p-quick-high --group 1440p-quick-high`
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group quick`
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --group 1080p-scaling --group 1440p-scaling`
 - Run all tests:
   - `games/tomb raider/benchmark/run_sottr_benchmark.sh --all`
 - Enable GameMode wrapper:
-  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --gamemode --group quick-4k`
+  - `games/tomb raider/benchmark/run_sottr_benchmark.sh --gamemode --group quick`
 
 Analyze results:
 
 - Analyze all tests:
   - `games/tomb raider/benchmark/analyze_sottr_results.sh`
 - Analyze a group:
-  - `games/tomb raider/benchmark/analyze_sottr_results.sh --group quick-4k`
+  - `games/tomb raider/benchmark/analyze_sottr_results.sh --group quick`
 - Analyze specific tests:
-  - `games/tomb raider/benchmark/analyze_sottr_results.sh native-1080p-low-rt-off dlss-quality-4k-high-rt-on`
+  - `games/tomb raider/benchmark/analyze_sottr_results.sh native-1080p-low-rt-off native-4k-high-rt-off`
 
 Convert markdown reports to graphical outputs:
 
