@@ -1,5 +1,5 @@
 # Tomb Raider benchmark test definitions
-# This file is sourced by run_tomb_raider_benchmark.sh
+# This file is sourced by run_sottr_benchmark.sh
 # Required by caller: declare -A TESTS
 # Format: TESTS["test-name"]="mode resolution quality ray_tracing frame_generation"
 

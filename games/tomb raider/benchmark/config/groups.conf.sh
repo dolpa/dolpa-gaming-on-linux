@@ -1,5 +1,5 @@
 # Tomb Raider benchmark test groups
-# This file is sourced by run_tomb_raider_benchmark.sh
+# This file is sourced by run_sottr_benchmark.sh
 # Required by caller: declare -A TEST_GROUPS
 
 TEST_GROUPS["quick"]="native-1080p-high-rt-off dlss-quality-1440p-high-rt-off fsr2-quality-1440p-high-rt-off"
