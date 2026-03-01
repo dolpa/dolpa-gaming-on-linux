@@ -278,6 +278,43 @@ except Exception:
 PY
 }
 
+extract_fps_triplet_from_txt() {
+	local txt_file="$1"
+	local benchmark_text_stream=""
+
+	if command -v strings >/dev/null 2>&1; then
+		benchmark_text_stream="$(strings -a "$txt_file")"
+	else
+		benchmark_text_stream="$(tr -cd '\11\12\15\40-\176' < "$txt_file")"
+	fi
+
+	local min_fps max_fps avg_fps
+	min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Min FPS:/{print $3; exit}')"
+	max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Max FPS:/{print $3; exit}')"
+	avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Average FPS:/{print $3; exit}')"
+
+	if [[ -z "$min_fps" || -z "$max_fps" || -z "$avg_fps" ]]; then
+		min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Min FPS:/{print $3; exit}')"
+		max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Max FPS:/{print $3; exit}')"
+		avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average FPS:/{print $3; exit}')"
+	fi
+
+	if [[ -n "$min_fps" && -n "$avg_fps" && -n "$max_fps" ]]; then
+		printf '%s|%s|%s\n' "$min_fps" "$avg_fps" "$max_fps"
+	else
+		echo "||"
+	fi
+}
+
+extract_timestamp_from_native_txt_name() {
+	local file_name="$1"
+	if [[ "$file_name" =~ _([0-9]{4})-([0-9]{2})-([0-9]{2})_([0-9]{2})\.([0-9]{2})\.([0-9]{2})\.txt$ ]]; then
+		echo "${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}_${BASH_REMATCH[4]}${BASH_REMATCH[5]}${BASH_REMATCH[6]}"
+	else
+		echo ""
+	fi
+}
+
 join_unique_values() {
 	if [[ $# -eq 0 ]]; then
 		echo "N/A"
@@ -651,7 +688,62 @@ for result_file in "${result_files[@]}"; do
 	fi
 done
 
+if [[ -z "${LATEST_RESULT_FILE_BY_KEY[*]-}" ]]; then
+	mapfile -t sorted_native_summary_txt < <(
+		find "$RESULTS_DIR" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null | sort -n | cut -d' ' -f2-
+	)
+
+	if [[ ${#sorted_native_summary_txt[@]} -gt 0 ]]; then
+		if [[ ${#sorted_native_summary_txt[@]} -lt ${#SELECTED_TESTS[@]} ]]; then
+			log_warning "Native TXT fallback: only ${#sorted_native_summary_txt[@]} benchmark summary files for ${#SELECTED_TESTS[@]} selected tests."
+		fi
+
+		start_index=0
+		if [[ ${#sorted_native_summary_txt[@]} -gt ${#SELECTED_TESTS[@]} ]]; then
+			start_index=$(( ${#sorted_native_summary_txt[@]} - ${#SELECTED_TESTS[@]} ))
+		fi
+
+		for idx in "${!SELECTED_TESTS[@]}"; do
+			source_idx=$((start_index + idx))
+			if [[ $source_idx -ge ${#sorted_native_summary_txt[@]} ]]; then
+				break
+			fi
+
+			test_name="${SELECTED_TESTS[$idx]}"
+			txt_file="${sorted_native_summary_txt[$source_idx]}"
+			fps_triplet="$(extract_fps_triplet_from_txt "$txt_file")"
+			IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
+
+			if [[ -z "$min_fps" || -z "$avg_fps" || -z "$max_fps" ]]; then
+				continue
+			fi
+
+			result_timestamp="$(extract_timestamp_from_native_txt_name "$(basename "$txt_file")")"
+			if [[ -z "$result_timestamp" ]]; then
+				result_timestamp="19700101_000000"
+			fi
+
+			result_key="${test_name}|unknown-gpu|unknown-vram|unknown-driver"
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$txt_file"
+			LATEST_MIN_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$min_fps")"
+			LATEST_AVG_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$avg_fps")"
+			LATEST_MAX_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$max_fps")"
+		done
+
+		mapped_count=0
+		for _result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+			mapped_count=$((mapped_count + 1))
+		done
+		log_info "Native TXT fallback applied: mapped ${mapped_count} benchmark summary files to selected tests."
+	fi
+fi
+
 for result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+	if [[ -n "${LATEST_MIN_FPS_BY_KEY[$result_key]+isset}" && -n "${LATEST_AVG_FPS_BY_KEY[$result_key]+isset}" && -n "${LATEST_MAX_FPS_BY_KEY[$result_key]+isset}" ]]; then
+		continue
+	fi
+
 	fps_triplet="$(extract_fps_triplet "${LATEST_RESULT_FILE_BY_KEY[$result_key]}")"
 	IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
 
