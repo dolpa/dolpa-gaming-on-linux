@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<registry>
+    <key name="HKEY_CLASSES_ROOT">
+    </key>
+    <key name="HKEY_CURRENT_CONFIG">
+    </key>
+    <key name="HKEY_CURRENT_USER">
+        <key name="AutoValueRemap">
+            <key name="GPURemap">
+                <key name="keys">
+                    <value name="Software\Eidos Montreal\Shadow of the Tomb Raider\Graphics" type="integer">1</value>
+                    <value name="Software\IndirectX\Direct3D\Config" type="integer">1</value>
+                </key>
+                <key name="values">
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\AvoidR11G11B10FloatRWUAV" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\AvoidR16FloatRWUAV" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\AvoidSIMDGroupReductions" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\CausticsRenderMode" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\DisableDynamicPoolGPUCopy" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\DisableVolumetricLightBlur" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\DrawcallCountPerContext" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\EnableAsyncCompute" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\EnableCopyQueues" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\ExposureRenderMode" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\FullScreen" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\InsertDPLBarrier" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\LowestLODBias" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\LowestLODScale" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\LowQualityBlendshapes" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\LowQualityParticleLighting" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\LowQualityTransparencyUpscale" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\MaxHeapPooledAllocSize" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\MaxTextureQuality" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\MergePostProcessing" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\OnePassHistogram" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\PredatorRenderMode" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\ReduceVolumetricLightingResolution" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\RestrictThreadGroupSize" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\ScreenH" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\ScreenW" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\SkipInteriorPass" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\STR371Workaround" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\UseAMDGatherWorkaround" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\UseAMDTempVariablesWorkaround" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\UseIntelManualDotProductWorkaround" type="integer">1</value>
+                    <value name="Software\Feral Interactive\Shadow of the Tomb Raider\Setup\UseMSAADepthBufferWithShaderWrite" type="integer">1</value>
+                </key>
+            </key>
+        </key>
+        <key name="Software">
+            <key name="Eidos Montreal">
+                <key name="Shadow of the Tomb Raider">
+                    <value name="ChannelFormat" type="integer">0</value>
+                    <value name="FirstRun" type="integer">0</value>
+                    <value name="SteamLanguage" type="integer">0</value>
+                    <value name="TextLanguage" type="integer">0</value>
+                    <value name="VOLanguage" type="integer">0</value>
+                    <key name="Graphics">
+                        <key name="Defaults">
+                            <value name="AA" type="integer">2</value>
+                            <value name="Preset" type="integer">4</value>
+                        </key>
+                        <key name="GeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)">
+                            <value name="AA" type="integer">2</value>
+                            <value name="AmbientOcclusionQuality" type="integer">1</value>
+                            <value name="AspectRatio" type="integer">0</value>
+                            <value name="AsyncCompute" type="integer">1</value>
+                            <value name="Bloom" type="integer">1</value>
+                            <value name="CAS" type="integer">0</value>
+                            <value name="CheckerBoard" type="integer">0</value>
+                            <value name="DefaultMaxNitsSet" type="integer">0</value>
+                            <value name="DOFQuality" type="integer">2</value>
+                            <value name="EnableDX12" type="integer">0</value>
+                            <value name="ExclusiveFullscreen" type="integer">1</value>
+                            <value name="ForceHalfRefreshRate" type="integer">0</value>
+                            <value name="FOVCorrection" type="integer">1000</value>
+                            <value name="Fullscreen" type="integer">1</value>
+                            <value name="FullscreenHeight" type="integer">1440</value>
+                            <value name="FullscreenWidth" type="integer">2560</value>
+                            <value name="HDR" type="integer">0</value>
+                            <value name="HDRContrast" type="integer">1065353216</value>
+                            <value name="HDRScale" type="integer">1000</value>
+                            <value name="HighPrecisionRT" type="integer">1</value>
+                            <value name="IsBezelCorrected" type="integer">0</value>
+                            <value name="LensFlares" type="integer">1</value>
+                            <value name="LevelOfDetail" type="integer">3</value>
+                            <value name="MaxMultiGPUCount" type="integer">4</value>
+                            <value name="Monitor" type="integer">0</value>
+                            <value name="MotionBlur" type="integer">1</value>
+                            <value name="MultiMonitorEnabled" type="integer">0</value>
+                            <value name="NormalizedGammaDecodingPower" type="integer">500</value>
+                            <value name="RayTracing" type="integer">0</value>
+                            <value name="RefreshRate" type="integer">60</value>
+                            <value name="ResolutionModifier" type="integer">1000</value>
+                            <value name="ScreenEffects" type="integer">1</value>
+                            <value name="ScreenSpaceContactShadows" type="integer">1</value>
+                            <value name="ScreenSpaceReflections" type="integer">1</value>
+                            <value name="ShadowQuality" type="integer">2</value>
+                            <value name="SpecularReflectionQuality" type="integer">0</value>
+                            <value name="StereoNearSeparationMultiplier" type="integer">350</value>
+                            <value name="StereoPopOut" type="integer">5000</value>
+                            <value name="Stereoscopic3DMode" type="integer">0</value>
+                            <value name="StereoSeparation" type="integer">22</value>
+                            <value name="Tessellation" type="integer">1</value>
+                            <value name="TextureFiltering" type="integer">3</value>
+                            <value name="TextureQuality" type="integer">2</value>
+                            <value name="TressFX" type="integer">1</value>
+                            <value name="UserWindowHeight" type="integer">1440</value>
+                            <value name="UserWindowWidth" type="integer">2560</value>
+                            <value name="VolumetricLighting" type="integer">1</value>
+                            <value name="VSync" type="integer">0</value>
+                            <value name="WindowHeight" type="integer">1440</value>
+                            <value name="WindowLeft" type="integer">480</value>
+                            <value name="WindowMaximized" type="integer">0</value>
+                            <value name="WindowTop" type="integer">270</value>
+                            <value name="WindowWidth" type="integer">2560</value>
+                        </key>
+                        <key name="llvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)">
+                        </key>
+                    </key>
+                    <key name="Input">
+                        <value name="Combat_Aim_1" type="integer">301</value>
+                        <value name="Combat_Aim_2" type="integer">1000</value>
+                        <value name="Combat_AlternateFire_1" type="integer">302</value>
+                        <value name="Combat_AlternateFire_2" type="integer">1000</value>
+                        <value name="Combat_HerbA_1" type="integer">59</value>
+                        <value name="Combat_HerbA_2" type="integer">303</value>
+                        <value name="Combat_HerbB_1" type="integer">60</value>
+                        <value name="Combat_HerbB_2" type="integer">304</value>
+                        <value name="Combat_HerbX_1" type="integer">61</value>
+                        <value name="Combat_HerbX_2" type="integer">1000</value>
+                        <value name="Combat_HerbY_1" type="integer">62</value>
+                        <value name="Combat_HerbY_2" type="integer">1000</value>
+                        <value name="Combat_Melee_1" type="integer">33</value>
+                        <value name="Combat_Melee_2" type="integer">1000</value>
+                        <value name="Combat_NextWeapon_1" type="integer">305</value>
+                        <value name="Combat_NextWeapon_2" type="integer">1000</value>
+                        <value name="Combat_PreviousWeapon_1" type="integer">306</value>
+                        <value name="Combat_PreviousWeapon_2" type="integer">1000</value>
+                        <value name="Combat_PrimaryFire_1" type="integer">300</value>
+                        <value name="Combat_PrimaryFire_2" type="integer">1000</value>
+                        <value name="Combat_Reload_1" type="integer">19</value>
+                        <value name="Combat_Reload_2" type="integer">1000</value>
+                        <value name="Combat_Select_Bow_1" type="integer">2</value>
+                        <value name="Combat_Select_Bow_2" type="integer">1000</value>
+                        <value name="Combat_Select_Pistol_1" type="integer">3</value>
+                        <value name="Combat_Select_Pistol_2" type="integer">1000</value>
+                        <value name="Combat_Select_Rifle_1" type="integer">4</value>
+                        <value name="Combat_Select_Rifle_2" type="integer">1000</value>
+                        <value name="Combat_Select_Shotgun_1" type="integer">5</value>
+                        <value name="Combat_Select_Shotgun_2" type="integer">1000</value>
+                        <value name="Combat_ShoulderSwap_1" type="integer">42</value>
+                        <value name="Combat_ShoulderSwap_2" type="integer">1000</value>
+                        <value name="Combat_Zoom_1" type="integer">44</value>
+                        <value name="Combat_Zoom_2" type="integer">1000</value>
+                        <value name="EnableLibScePad" type="integer">1</value>
+                        <value name="EnableMouseSmoothing" type="integer">1</value>
+                        <value name="Menu_Journal_1" type="integer">15</value>
+                        <value name="Menu_Journal_2" type="integer">1000</value>
+                        <value name="Menu_Pause_1" type="integer">1</value>
+                        <value name="Menu_Pause_2" type="integer">1000</value>
+                        <value name="Player_Backward_1" type="integer">31</value>
+                        <value name="Player_Backward_2" type="integer">1000</value>
+                        <value name="Player_Forward_1" type="integer">17</value>
+                        <value name="Player_Forward_2" type="integer">1000</value>
+                        <value name="Player_Instinct_1" type="integer">16</value>
+                        <value name="Player_Instinct_2" type="integer">1000</value>
+                        <value name="Player_Interact_1" type="integer">18</value>
+                        <value name="Player_Interact_2" type="integer">1000</value>
+                        <value name="Player_Jump_1" type="integer">57</value>
+                        <value name="Player_Jump_2" type="integer">1000</value>
+                        <value name="Player_Left_1" type="integer">30</value>
+                        <value name="Player_Left_2" type="integer">1000</value>
+                        <value name="Player_Right_1" type="integer">32</value>
+                        <value name="Player_Right_2" type="integer">1000</value>
+                        <value name="Player_Roll_1" type="integer">46</value>
+                        <value name="Player_Roll_2" type="integer">1000</value>
+                        <value name="Player_Slow_1" type="integer">29</value>
+                        <value name="Player_Slow_2" type="integer">1000</value>
+                        <value name="Player_Sprint_1" type="integer">42</value>
+                        <value name="Player_Sprint_2" type="integer">1000</value>
+                        <value name="Player_SwimSubmerge_1" type="integer">29</value>
+                        <value name="Player_SwimSubmerge_2" type="integer">1000</value>
+                        <value name="Player_SwimSurface_1" type="integer">57</value>
+                        <value name="Player_SwimSurface_2" type="integer">1000</value>
+                        <value name="VoiceChat_1" type="integer">47</value>
+                        <value name="VoiceChat_2" type="integer">1000</value>
+                    </key>
+                </key>
+            </key>
+            <key name="Feral Interactive">
+                <key name="Shadow of the Tomb Raider">
+                    <key name="Setup">
+                        <value name="AddSteamCloudAlias" type="integer">0</value>
+                        <value name="AllowPausing" type="integer">1</value>
+                        <value name="AllowSendCrashReports" type="integer">0</value>
+                        <value name="AllowSendUsageData" type="integer">0</value>
+                        <value name="AvoidSwapInjectionDuringPGOW" type="integer">1</value>
+                        <value name="BufferedPacketData" type="binary">a9e3886a243031239b5bf5a9dee95e3582dfbf407d8f06375454ac1c65814e011ebda02703f6590ff2836a21f57b6712c6f6b67f7cde8618e00b9c581d2e606753ce66afcf03cf695f8aed70651a026b625e9563dbe05041506b3d3bc6a4e64d752f94d2e2d16b8e6582d656e451e5f32fff8981593fe3f84a4ab093cc62dfd45f8aed70651a026ba9e3886a24303123506b3d3bc6a4e64d9b5bf5a9dee95e3553ce66afcf03cf69e00b9c581d2e60676582d656e451e5f3c6f6b67f7cde8618752f94d2e2d16b8e4a4ab093cc62dfd41ebda02703f6590f2fff8981593fe3f882dfbf407d8f0637625e9563dbe05041f2836a21f57b67125454ac1c65814e01</value>
+                        <value name="CardRenderer" type="string">GeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2) 8151MB</value>
+                        <value name="ConstrainLiveWindowResize" type="integer">1</value>
+                        <value name="DoneMinOS" type="integer">0</value>
+                        <value name="DonePromotional" type="integer">0</value>
+                        <value name="DoneUnsupported" type="integer">0</value>
+                        <value name="EnableFeralNetNotificationSounds" type="integer">0</value>
+                        <value name="EnableTesterMode" type="integer">0</value>
+                        <value name="FeralAnalyticsInstallID" type="string">ErXBjWAnif03eAXoTX04dYrc</value>
+                        <value name="GameInstallVersion" type="integer">16777984</value>
+                        <value name="GameInstallVersionString" type="string">Shadow of the Tomb Raider v1.0.3</value>
+                        <value name="GameInstallVersionWithStages" type="integer">17006592</value>
+                        <value name="GameOptionsDialogLastTab" type="integer">30000</value>
+                        <value name="GameOptionsDialogShouldShow" type="integer">0</value>
+                        <value name="GameOptionsDialogShouldShowBigPicture" type="integer">1</value>
+                        <value name="GameOptionsDialogShown" type="integer">1</value>
+                        <value name="GameSelected" type="integer">0</value>
+                        <value name="GameVersionNew" type="integer">16777984</value>
+                        <value name="GameVersionString" type="string">Shadow of the Tomb Raider v1.0.3</value>
+                        <value name="IgnoreLanguageHeadings" type="integer">1</value>
+                        <value name="LiveWindowResizePercentage" type="integer">0</value>
+                        <value name="LiveWindowResizeThreshold" type="integer">0</value>
+                        <value name="MinWindowedHeight" type="integer">0</value>
+                        <value name="MinWindowedWidth" type="integer">0</value>
+                        <value name="PauseMoviesOnPause" type="integer">1</value>
+                        <value name="PauseOnSuspend" type="integer">1</value>
+                        <value name="PauseSoundOnPause" type="integer">1</value>
+                        <value name="PauseTimersOnPause" type="integer">1</value>
+                        <value name="RestoreMouseOnSuspend" type="integer">1</value>
+                        <value name="RestoreResOnSuspend" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDHigh_DefaultGeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDHigh_Defaultllvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDHighest_DefaultGeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDHighest_Defaultllvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDLow_DefaultGeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDLow_Defaultllvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDLowest_DefaultGeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDLowest_Defaultllvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDMedium_DefaultGeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDMedium_Defaultllvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDNVIDIAConfig1.0b2GeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)" type="integer">1</value>
+                        <value name="SeenSpecificationAlertUUIDPerRendererMappedSettingsV7" type="integer">1</value>
+                        <value name="ShowAssertAlerts" type="integer">0</value>
+                        <value name="ShowTheHideDockCheckbox" type="integer">0</value>
+                        <value name="SoftwareUpdatedAskedUser" type="integer">1</value>
+                        <value name="SoftwareUpdatedCanCheck" type="integer">1</value>
+                        <value name="SpecificationFirstLaunchCheck" type="integer">0</value>
+                        <value name="SpecificationLastUpdateCheckTime" type="binary">b258a36900000000</value>
+                        <value name="SpecificationUpdateURL" type="string">https://u1.feralinteractive.com/autoupdate/shadowofthetombraider/specifications_linux_1_0_3.xml</value>
+                        <value name="SpecificationURLBase" type="string">https://u1.feralinteractive.com/autoupdate/shadowofthetombraider</value>
+                        <value name="UpdateServerDomain" type="string">u1.feralinteractive.com</value>
+                        <value name="UpdateServerPath" type="string">/autoupdate/</value>
+                        <value name="UpdateServerProtocol" type="string">https://</value>
+                        <value name="VOLanguage" type="integer">0</value>
+                        <key name="GeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)">
+                            <value name="EnableCopyQueues" type="integer">1</value>
+                            <value name="FullScreen" type="integer">1</value>
+                            <value name="ScreenH" type="integer">1440</value>
+                            <value name="ScreenW" type="integer">2560</value>
+                        </key>
+                        <key name="llvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)">
+                            <value name="ScreenH" type="integer">1440</value>
+                            <value name="ScreenW" type="integer">2560</value>
+                        </key>
+                        <key name="SpecificationAlerts">
+                            <value name="LnxCPUGovernorSubOptimal" type="integer">1</value>
+                            <value name="LnxDistributionUnsupported" type="integer">0</value>
+                        </key>
+                    </key>
+                </key>
+            </key>
+            <key name="IndirectX">
+                <key name="Direct3D">
+                    <key name="Config">
+                        <value name="PullVertexAttributes" type="integer">1</value>
+                        <value name="UseBufferForICB" type="integer">8</value>
+                        <value name="UseFastDivByZero" type="integer">1</value>
+                        <value name="UseFastFMA" type="integer">1</value>
+                        <value name="VulkanAllowRTFallbackToSystemRAM" type="integer">1</value>
+                        <value name="VulkanEnableSubmitBatching" type="integer">1</value>
+                        <value name="VulkanUseDynamicDescriptors" type="integer">1</value>
+                        <key name="GeForce RTX 5060 Vulkan NVIDIA (61e6c96d,e277f913,4c1224e3,9339a7f2)">
+                            <value name="VulkanMemoryResidencyTransferQueue" type="integer">1</value>
+                            <value name="VulkanTransferQueueCount" type="integer">1</value>
+                        </key>
+                        <key name="llvmpipe Vulkan unknown (6173656d,322e3532,302d382e,756275)">
+                        </key>
+                    </key>
+                </key>
+            </key>
+            <key name="MacDoze">
+                <key name="Config">
+                    <value name="ClearSavesEnabled" type="integer">0</value>
+                    <value name="DisableClearSaveDataAlert" type="integer">0</value>
+                    <value name="ExtraCommandLine" type="string"></value>
+                    <value name="ExtraCommandLineEnabled" type="integer">0</value>
+                </key>
+            </key>
+            <key name="SystemMonitor">
+                <key name="Config">
+                    <value name="AppVersion" type="integer">16777984</value>
+                    <value name="Backgrounded" type="integer">0</value>
+                    <value name="OSVersion" type="string">6.17</value>
+                    <value name="QuitIntentional" type="integer">1</value>
+                </key>
+            </key>
+        </key>
+    </key>
+    <key name="HKEY_LOCAL_MACHINE">
+        <key name="Hardware">
+            <key name="Description">
+                <key name="System">
+                    <key name="CentralProcessor">
+                        <key name="0">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="1">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="10">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="11">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="12">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="13">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="14">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="15">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="16">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="17">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="18">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="19">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="2">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="3">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="4">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="5">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="6">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="7">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="8">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                        <key name="9">
+                            <value name="Identifier" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="ProcessorNameString" type="string">Intel(R) Core(TM) Ultra 7 265KF</value>
+                            <value name="VendorIdentifier" type="string">GenuineIntel</value>
+                            <value name="~MHz" type="integer">5500</value>
+                        </key>
+                    </key>
+                </key>
+            </key>
+        </key>
+        <key name="Software">
+        </key>
+    </key>
+    <key name="HKEY_USERS">
+    </key>
+</registry>
