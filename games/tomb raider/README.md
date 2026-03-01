@@ -127,7 +127,8 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_sottr_results.sh`):
 
 <!-- TEST_RESULTS_START -->
-- _No reports added yet._
+- [sottr_benchmark_report_20260301_141758.md](benchmark/results/sottr_benchmark_report_20260301_141758.md)
+- [sottr_benchmark_report_20260301_140603.md](benchmark/results/sottr_benchmark_report_20260301_140603.md)
 <!-- TEST_RESULTS_END -->
 
 ## Logs and output locations
