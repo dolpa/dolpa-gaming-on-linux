@@ -35,6 +35,8 @@ BENCHMARK_RESULTS_SOURCE_DIR=""
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"
 NATIVE_PREFERENCES_FILE="${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences"
 NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
+PROTON_PROFILE_FILE=""
+PROTON_PREFERENCES_PROFILE_SUFFIX=".profile.dat"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 
 if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
@@ -53,9 +55,9 @@ fi
 
 # Proton selection precedence:
 # 1) SOTTR_PROTON_VERSION (game-specific override)
-# 2) PROTON_VERSION (shared system default)
-# 3) SOTTR_PROTON_VERSION_DEFAULT (game fallback)
-PROTON_VERSION="${SOTTR_PROTON_VERSION:-${PROTON_VERSION:-$SOTTR_PROTON_VERSION_DEFAULT}}"
+# 2) SOTTR_PROTON_VERSION_DEFAULT (game default)
+# 3) PROTON_VERSION (shared system fallback)
+PROTON_VERSION="${SOTTR_PROTON_VERSION:-${SOTTR_PROTON_VERSION_DEFAULT:-${PROTON_VERSION:-}}}"
 
 # Launch mode selection precedence:
 # 1) SOTTR_LAUNCH_MODE (game-specific override)
@@ -555,18 +557,18 @@ copy_benchmark_result_file() {
     local latest_native_txt=""
     latest_native_txt="$(
         for candidate_dir in "${existing_source_dirs[@]}"; do
-            find "$candidate_dir" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
+            find "$candidate_dir" -maxdepth 1 -type f \( -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' -o -name 'SOTTR_*.txt' \) ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
         done | awk -v since="$search_since_epoch" 'since <= 0 || $1 >= since' | sort -nr | head -n1 | cut -d' ' -f2-
     )"
 
     if [[ -z "$latest_native_txt" && "$search_since_epoch" -gt 0 ]]; then
         latest_native_txt="$(
             for candidate_dir in "${existing_source_dirs[@]}"; do
-                find "$candidate_dir" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
+                find "$candidate_dir" -maxdepth 1 -type f \( -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' -o -name 'SOTTR_*.txt' \) ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null
             done | sort -nr | head -n1 | cut -d' ' -f2-
         )"
         if [[ -n "$latest_native_txt" ]]; then
-            log_to_file warning "$log" "No fresh native summary TXT found since epoch ${search_since_epoch}; falling back to latest available file."
+            log_to_file warning "$log" "No fresh benchmark summary TXT found since epoch ${search_since_epoch}; falling back to latest available file."
         fi
     fi
 
@@ -646,6 +648,61 @@ apply_native_preferences_profile() {
         log_to_file info "$log" "Copied native preferences profile: $source_preferences_profile -> $preferences_file"
     else
         log_to_file warning "$log" "Failed to copy native preferences profile: $source_preferences_profile"
+    fi
+}
+
+resolve_proton_profile_file() {
+    if [[ -n "${PROTON_PROFILE_FILE:-}" && -f "$PROTON_PROFILE_FILE" ]]; then
+        return 0
+    fi
+
+    local -a proton_documents_candidates=(
+        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider"
+        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider"
+        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider"
+        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider"
+    )
+
+    local candidate_dir
+    for candidate_dir in "${proton_documents_candidates[@]}"; do
+        [[ -d "$candidate_dir" ]] || continue
+
+        local detected_profile_file=""
+        detected_profile_file="$(find "$candidate_dir" -maxdepth 2 -type f -path '*/[0-9]*/profile.dat' 2>/dev/null | head -n1)"
+        if [[ -n "$detected_profile_file" ]]; then
+            PROTON_PROFILE_FILE="$detected_profile_file"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+apply_proton_preferences_profile() {
+    local test_name="$1"
+    local log="$2"
+
+    if [[ -z "$test_name" ]]; then
+        log_to_file warning "$log" "No test name provided, skipping Proton profile copy."
+        return 0
+    fi
+
+    local source_proton_profile="${PROFILES_DIR}/${test_name}${PROTON_PREFERENCES_PROFILE_SUFFIX}"
+    if [[ ! -f "$source_proton_profile" ]]; then
+        log_to_file warning "$log" "Proton profile not found: $source_proton_profile"
+        return 0
+    fi
+
+    if ! resolve_proton_profile_file; then
+        log_to_file warning "$log" "Proton target profile.dat not found under compatdata/${GAME_ID}; skipping Proton profile copy."
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$PROTON_PROFILE_FILE")"
+    if cp "$source_proton_profile" "$PROTON_PROFILE_FILE"; then
+        log_to_file info "$log" "Copied Proton profile: $source_proton_profile -> $PROTON_PROFILE_FILE"
+    else
+        log_to_file warning "$log" "Failed to copy Proton profile: $source_proton_profile"
     fi
 }
 
@@ -930,6 +987,8 @@ run_bench() {
     apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
     if [[ "$launch_mode" == "native" ]]; then
         apply_native_preferences_profile "$test_name" "$log"
+    else
+        apply_proton_preferences_profile "$test_name" "$log"
     fi
     log_to_file info "$log" "Launch args: ${direct_benchmark_args[*]} ${launch_args[*]}"
 

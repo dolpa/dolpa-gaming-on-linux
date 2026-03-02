@@ -120,8 +120,8 @@ Control launch mode using either CLI flags or environment variables:
 Proton selection precedence:
 
 1. `SOTTR_PROTON_VERSION`
-2. `PROTON_VERSION`
-3. `SOTTR_PROTON_VERSION_DEFAULT`
+2. `SOTTR_PROTON_VERSION_DEFAULT`
+3. `PROTON_VERSION`
 
 ### Steam Compatibility setting (important)
 
