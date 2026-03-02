@@ -27,3 +27,11 @@
 | native-4k-medium-rt-off | native | 3840x2160 | medium | off | off | nvidia-geforce-rtx-5060 | 8151mb | 590.48.01 | 0.00 | 34.30 | 73.80 |
 | native-4k-high-rt-off | native | 3840x2160 | high | off | off | nvidia-geforce-rtx-5060 | 8151mb | 590.48.01 | 0.00 | 30.40 | 68.60 |
 | native-4k-ultra-rt-off | native | 3840x2160 | ultra | off | off | nvidia-geforce-rtx-5060 | 8151mb | 590.48.01 | 0.00 | 25.60 | 60.70 |
+
+## Graphical Results
+
+![Average FPS chart](./sottr_benchmark_report_20260302_205207_avg_fps_1920x1080.png)
+
+![Average FPS chart](./sottr_benchmark_report_20260302_205207_avg_fps_2560x1440.png)
+
+![Average FPS chart](./sottr_benchmark_report_20260302_205207_avg_fps_3840x2160.png)
