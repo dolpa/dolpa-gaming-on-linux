@@ -752,23 +752,33 @@ run_bench() {
         return 1
     fi
 
-    timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s" \
-        env \
-        "SteamAppId=${GAME_ID}" \
-        "SteamGameId=${GAME_ID}" \
-        "PROTON_VERB=waitforexitandrun" \
-        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
-        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
-        "STEAM_RUNTIME=1" \
-        "PROTON_LOG=1" \
-        "VKD3D_FEATURE_LEVEL=12_0" \
-        "${proton_run_cmd[@]}" run \
-        "$exe_path" \
-        --launcher-skip \
-        --intro-skip \
-        "${launch_args[@]}" \
-        -benchmark \
-        >>"$log" 2>&1
+    local -a full_launch_cmd=(
+        timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
+        env
+        "SteamAppId=${GAME_ID}"
+        "SteamGameId=${GAME_ID}"
+        "PROTON_VERB=waitforexitandrun"
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
+        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
+        "STEAM_RUNTIME=1"
+        "PROTON_LOG=1"
+        "VKD3D_FEATURE_LEVEL=12_0"
+        "${proton_run_cmd[@]}" run
+        "$exe_path"
+        --launcher-skip
+        --intro-skip
+        "${launch_args[@]}"
+        -benchmark
+    )
+
+    local full_launch_cmd_pretty=""
+    printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
+    log_to_file info "$log" "Full launch command: cd $(printf '%q' "$game_path") && ${full_launch_cmd_pretty% }"
+
+    (
+        cd "$game_path" || exit 1
+        "${full_launch_cmd[@]}"
+    ) >>"$log" 2>&1
     
     local exit_code=$?
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
