@@ -83,7 +83,7 @@
                             <value name="HighPrecisionRT" type="integer">1</value>
                             <value name="IsBezelCorrected" type="integer">0</value>
                             <value name="LensFlares" type="integer">1</value>
-                            <value name="LevelOfDetail" type="integer">3</value>
+                            <value name="LevelOfDetail" type="integer">4</value>
                             <value name="MaxMultiGPUCount" type="integer">4</value>
                             <value name="Monitor" type="integer">0</value>
                             <value name="MotionBlur" type="integer">1</value>
@@ -93,9 +93,9 @@
                             <value name="RefreshRate" type="integer">60</value>
                             <value name="ResolutionModifier" type="integer">1000</value>
                             <value name="ScreenEffects" type="integer">1</value>
-                            <value name="ScreenSpaceContactShadows" type="integer">1</value>
+                            <value name="ScreenSpaceContactShadows" type="integer">2</value>
                             <value name="ScreenSpaceReflections" type="integer">1</value>
-                            <value name="ShadowQuality" type="integer">3</value>
+                            <value name="ShadowQuality" type="integer">4</value>
                             <value name="SpecularReflectionQuality" type="integer">0</value>
                             <value name="StereoNearSeparationMultiplier" type="integer">350</value>
                             <value name="StereoPopOut" type="integer">5000</value>
@@ -243,7 +243,7 @@
                         <value name="SoftwareUpdatedAskedUser" type="integer">1</value>
                         <value name="SoftwareUpdatedCanCheck" type="integer">1</value>
                         <value name="SpecificationFirstLaunchCheck" type="integer">0</value>
-                        <value name="SpecificationLastUpdateCheckTime" type="binary">b258a36900000000</value>
+                        <value name="SpecificationLastUpdateCheckTime" type="binary">49cda56900000000</value>
                         <value name="SpecificationUpdateURL" type="string">https://u1.feralinteractive.com/autoupdate/shadowofthetombraider/specifications_linux_1_0_3.xml</value>
                         <value name="SpecificationURLBase" type="string">https://u1.feralinteractive.com/autoupdate/shadowofthetombraider</value>
                         <value name="UpdateServerDomain" type="string">u1.feralinteractive.com</value>
@@ -262,7 +262,7 @@
                         </key>
                         <key name="SpecificationAlerts">
                             <value name="LnxCPUGovernorSubOptimal" type="integer">1</value>
-                            <value name="LnxDistributionUnsupported" type="integer">0</value>
+                            <value name="LnxDistributionUnsupported" type="integer">1</value>
                         </key>
                     </key>
                 </key>

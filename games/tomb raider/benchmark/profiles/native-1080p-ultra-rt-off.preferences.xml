@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <registry>
     <key name="HKEY_CLASSES_ROOT">
     </key>
@@ -83,7 +83,7 @@
                             <value name="HighPrecisionRT" type="integer">1</value>
                             <value name="IsBezelCorrected" type="integer">0</value>
                             <value name="LensFlares" type="integer">1</value>
-                            <value name="LevelOfDetail" type="integer">3</value>
+                            <value name="LevelOfDetail" type="integer">4</value>
                             <value name="MaxMultiGPUCount" type="integer">4</value>
                             <value name="Monitor" type="integer">0</value>
                             <value name="MotionBlur" type="integer">1</value>
@@ -93,9 +93,9 @@
                             <value name="RefreshRate" type="integer">60</value>
                             <value name="ResolutionModifier" type="integer">1000</value>
                             <value name="ScreenEffects" type="integer">1</value>
-                            <value name="ScreenSpaceContactShadows" type="integer">1</value>
+                            <value name="ScreenSpaceContactShadows" type="integer">2</value>
                             <value name="ScreenSpaceReflections" type="integer">1</value>
-                            <value name="ShadowQuality" type="integer">3</value>
+                            <value name="ShadowQuality" type="integer">4</value>
                             <value name="SpecularReflectionQuality" type="integer">0</value>
                             <value name="StereoNearSeparationMultiplier" type="integer">350</value>
                             <value name="StereoPopOut" type="integer">5000</value>
@@ -290,7 +290,7 @@
                 <key name="Config">
                     <value name="ClearSavesEnabled" type="integer">0</value>
                     <value name="DisableClearSaveDataAlert" type="integer">0</value>
-                    <value name="ExtraCommandLine" type="string"></value>
+                    <value name="ExtraCommandLine" type="string" />
                     <value name="ExtraCommandLineEnabled" type="integer">0</value>
                 </key>
             </key>
