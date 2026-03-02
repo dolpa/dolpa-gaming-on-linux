@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <registry>
     <key name="HKEY_CLASSES_ROOT">
     </key>
@@ -290,7 +290,7 @@
                 <key name="Config">
                     <value name="ClearSavesEnabled" type="integer">0</value>
                     <value name="DisableClearSaveDataAlert" type="integer">0</value>
-                    <value name="ExtraCommandLine" type="string"></value>
+                    <value name="ExtraCommandLine" type="string" />
                     <value name="ExtraCommandLineEnabled" type="integer">0</value>
                 </key>
             </key>
