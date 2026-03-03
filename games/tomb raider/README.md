@@ -144,6 +144,24 @@ Recommended workflow when changing mode:
 
 This avoids mixing native and Proton runtime state between sessions.
 
+### Proton-mode known limitation (manual benchmark trigger required)
+
+In `proton` launch mode, fully automatic benchmark triggering is still not working.
+
+Current behavior:
+
+- The script applies the selected test profile/settings.
+- The script starts the game in Proton mode.
+- The in-game benchmark does **not** auto-start yet.
+
+For now, you still need to do this manually in-game:
+
+1. Open `Options` → `Display & Graphics`.
+2. Press `R` to start the benchmark.
+3. After the benchmark finishes, exit the game.
+
+After you exit, benchmark result files are still copied automatically into `benchmark/results/`.
+
 ## System-specific configuration
 
 Machine-dependent paths/settings are separated from the main script.
