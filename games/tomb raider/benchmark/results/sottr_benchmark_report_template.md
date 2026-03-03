@@ -1,6 +1,6 @@
 # Shadow of the Tomb Raider Benchmark Report Template
 
-- Generated: 2026-03-02 20:52:07 IST
+- Generated: 2026-03-03 07:21:39 IST
 - JSON archive directory: /home/pavel/Documents/GitHub/dolpa-gaming-on-linux/games/tomb raider/benchmark/results
 - Benchmark source directory: /home/pavel/.local/share/feral-interactive/Shadow of the Tomb Raider/SaveData
 - Mode: Template (blank FPS cells)
@@ -15,15 +15,27 @@
 
 | Test Name | Mode | Resolution | Quality | Ray Tracing | Frame Generation | GPU Model | GPU VRAM | Driver | Min FPS | Avg FPS | Max FPS |
 |---|---|---|---|---|---|---|---|---|---:|---:|---:|
-| native-1080p-low-rt-off | native | 1920x1080 | low | off | off |  |  |  |  |  |  |
-| native-1080p-medium-rt-off | native | 1920x1080 | medium | off | off |  |  |  |  |  |  |
-| native-1080p-high-rt-off | native | 1920x1080 | high | off | off |  |  |  |  |  |  |
-| native-1080p-ultra-rt-off | native | 1920x1080 | ultra | off | off |  |  |  |  |  |  |
-| native-1440p-low-rt-off | native | 2560x1440 | low | off | off |  |  |  |  |  |  |
-| native-1440p-medium-rt-off | native | 2560x1440 | medium | off | off |  |  |  |  |  |  |
-| native-1440p-high-rt-off | native | 2560x1440 | high | off | off |  |  |  |  |  |  |
-| native-1440p-ultra-rt-off | native | 2560x1440 | ultra | off | off |  |  |  |  |  |  |
-| native-4k-low-rt-off | native | 3840x2160 | low | off | off |  |  |  |  |  |  |
-| native-4k-medium-rt-off | native | 3840x2160 | medium | off | off |  |  |  |  |  |  |
-| native-4k-high-rt-off | native | 3840x2160 | high | off | off |  |  |  |  |  |  |
-| native-4k-ultra-rt-off | native | 3840x2160 | ultra | off | off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1080p-low | dlss-ultra-performance | 1920x1080 | low | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1080p-low | dlss-ultra-performance | 1920x1080 | low | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1080p-medium | dlss-ultra-performance | 1920x1080 | medium | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1080p-medium | dlss-ultra-performance | 1920x1080 | medium | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1080p-high | dlss-ultra-performance | 1920x1080 | high | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1080p-high | dlss-ultra-performance | 1920x1080 | high | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1080p-ultra | dlss-ultra-performance | 1920x1080 | ultra | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1080p-ultra | dlss-ultra-performance | 1920x1080 | ultra | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1440p-low | dlss-ultra-performance | 2560x1440 | low | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1440p-low | dlss-ultra-performance | 2560x1440 | low | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1440p-medium | dlss-ultra-performance | 2560x1440 | medium | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1440p-medium | dlss-ultra-performance | 2560x1440 | medium | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1440p-high | dlss-ultra-performance | 2560x1440 | high | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1440p-high | dlss-ultra-performance | 2560x1440 | high | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-1440p-ultra | dlss-ultra-performance | 2560x1440 | ultra | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-1440p-ultra | dlss-ultra-performance | 2560x1440 | ultra | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-4k-low | dlss-ultra-performance | 3840x2160 | low | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-4k-low | dlss-ultra-performance | 3840x2160 | low | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-4k-medium | dlss-ultra-performance | 3840x2160 | medium | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-4k-medium | dlss-ultra-performance | 3840x2160 | medium | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-4k-high | dlss-ultra-performance | 3840x2160 | high | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-4k-high | dlss-ultra-performance | 3840x2160 | high | off | off off |  |  |  |  |  |  |
+| proton-dx12-on-dlss-ultra-performance-4k-ultra | dlss-ultra-performance | 3840x2160 | ultra | off | off on |  |  |  |  |  |  |
+| proton-dx12-off-dlss-ultra-performance-4k-ultra | dlss-ultra-performance | 3840x2160 | ultra | off | off off |  |  |  |  |  |  |
