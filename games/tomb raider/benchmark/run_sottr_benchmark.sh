@@ -663,6 +663,11 @@ resolve_proton_profile_file() {
         fi
     fi
 
+    if [[ -n "${STEAM_COMPAT_DATA_PATH:-}" ]]; then
+        PROTON_PROFILE_FILE="${STEAM_COMPAT_DATA_PATH}/pfx/user.reg"
+        return 0
+    fi
+
     local -a proton_profile_candidates=(
         "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/user.reg"
         "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/user.reg"
@@ -914,6 +919,14 @@ run_bench() {
         return 1
     fi
 
+    local steam_library_path="${CUSTOM_LIBRARY_PATH}"
+    if [[ "$game_path" == */steamapps/common/* ]]; then
+        steam_library_path="${game_path%%/steamapps/common/*}"
+    fi
+    local steam_compat_data_path="${steam_library_path}/steamapps/compatdata/${GAME_ID}"
+    export STEAM_COMPAT_DATA_PATH="$steam_compat_data_path"
+    export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH"
+
     local requested_launch_mode="${SOTTR_LAUNCH_MODE:-native}"
     local launch_mode="proton"
     local exe_path=""
@@ -1039,9 +1052,6 @@ run_bench() {
         )
     else
         # Set up compatibility environment for Proton launches
-        export STEAM_COMPAT_DATA_PATH="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
-        export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH"
-
         local -a proton_run_cmd
         proton_run_cmd=("$proton_path/proton")
 
@@ -1061,7 +1071,7 @@ run_bench() {
             "SteamGameId=${GAME_ID}"
             "PROTON_VERB=waitforexitandrun"
             "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
-            "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
+            "STEAM_COMPAT_DATA_PATH=$steam_compat_data_path"
             "STEAM_RUNTIME=1"
             "PROTON_LOG=1"
             "VKD3D_FEATURE_LEVEL=12_0"
@@ -1097,7 +1107,7 @@ run_bench() {
     if [[ "$launch_mode" == "proton" ]]; then
         env \
             "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
-            "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
+            "STEAM_COMPAT_DATA_PATH=$steam_compat_data_path" \
             "$proton_path/proton" run wineserver -k >>"$log" 2>&1 || true
 
         pkill -f "SOTTR.exe|SOTTR_DX12.exe|TombRaider.exe|TombRaiderLauncher.exe|CrashReporter" >/dev/null 2>&1 || true
