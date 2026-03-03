@@ -6,8 +6,10 @@ Benchmark automation and profile management for Shadow of the Tomb Raider on Lin
 
 - `benchmark/run_sottr_benchmark.sh`
   - Runs predefined benchmark tests/groups via CLI.
-  - Uses per-test native preferences snapshots: `profiles/{TEST_NAME}.preferences.xml`.
-  - Copies selected preferences snapshot into live native preferences before each native run.
+  - Uses per-test profile snapshots by launch mode:
+    - native: `profiles/{TEST_NAME}.preferences.xml`
+    - proton: `profiles/{TEST_NAME}.preferences.user.reg`
+  - Copies selected profile snapshot into live settings target before each run.
   - Copies benchmark outputs into local `benchmark/results/` with run + GPU metadata.
 - `benchmark/analyze_sottr_results.sh`
   - Builds markdown reports from copied benchmark result files.
@@ -22,7 +24,7 @@ Benchmark automation and profile management for Shadow of the Tomb Raider on Lin
 - `benchmark/config/groups.proton.conf.sh`
   - Proton-mode predefined groups.
 - `benchmark/profiles/`
-  - Contains one native preferences XML per test name.
+  - Contains one profile file per test name for native and proton catalogs.
 - `benchmark/results/`
   - Stores copied benchmark result files and generated markdown reports.
 
@@ -35,9 +37,7 @@ This benchmark suite is intentionally native Linux focused. For the native Linux
 - Frame Generation is not used.
 - Resolution scaling is handled by native game settings (for example Resolution Modifier), not AI upscalers.
 
-Because of that, this repository now keeps only native profiles and native test groups.
-
-If you specifically want DLSS/RT/FG testing, run the Windows build via Proton and maintain a separate Proton-focused profile set.
+Proton-mode tests remain available for Windows-feature benchmarking (for example DX12 toggles and DLSS Ultra Performance presets).
 
 ## Available tests and how they work
 
@@ -45,7 +45,7 @@ Tests come directly from:
 
 - `benchmark/config/tests.native.conf.sh`
 
-Current scope is native-only and includes 12 tests:
+Native scope includes 12 tests:
 
 - 1080p: low / medium / high / ultra (`rt-off`)
 - 1440p: low / medium / high / ultra (`rt-off`)
@@ -81,10 +81,11 @@ Key groups:
 For each test:
 
 1. Script selects test parameters from `tests.native.conf.sh`.
-2. For native runs, script copies:
-   - `benchmark/profiles/{TEST_NAME}.preferences.xml`
-   - into live file:
-   - `~/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences`
+2. Script copies profile by launch mode:
+  - native source: `benchmark/profiles/{TEST_NAME}.preferences.xml`
+  - native target: `~/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences`
+  - proton source: `benchmark/profiles/{TEST_NAME}.preferences.user.reg`
+  - proton target: `.../steamapps/compatdata/750920/pfx/user.reg`
 3. Launches benchmark (native first, Proton fallback when needed).
 4. Finds latest benchmark artifacts in result source location.
 5. Copies normalized result artifact(s) into:
@@ -185,6 +186,7 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_sottr_results.sh`):
 
 <!-- TEST_RESULTS_START -->
+- [sottr_benchmark_report_20260303_072138.md](benchmark/results/sottr_benchmark_report_20260303_072138.md)
 - [sottr_benchmark_report_20260302_205207.md](benchmark/results/sottr_benchmark_report_20260302_205207.md)
 - [sottr_benchmark_report_20260301_230717.md](benchmark/results/sottr_benchmark_report_20260301_230717.md)
 - [sottr_benchmark_report_20260301_141758.md](benchmark/results/sottr_benchmark_report_20260301_141758.md)
@@ -203,9 +205,10 @@ Current defaults:
 ## Profile rules
 
 - Required naming format:
-  - `{TEST_NAME}.preferences.xml`
+  - native launch mode: `{TEST_NAME}.preferences.xml`
+  - proton launch mode: `{TEST_NAME}.preferences.user.reg`
 - Strict behavior:
-  - `--validate-profiles` fails if any selected test profile XML is missing.
+  - `--validate-profiles` fails if any selected test profile is missing for the active launch mode.
 - Validate all profile files:
   - `games/tomb raider/benchmark/run_sottr_benchmark.sh --validate-profiles`
 
