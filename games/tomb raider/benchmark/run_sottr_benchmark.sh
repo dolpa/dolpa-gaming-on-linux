@@ -36,7 +36,7 @@ BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"
 NATIVE_PREFERENCES_FILE="${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/preferences"
 NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
 PROTON_PROFILE_FILE=""
-PROTON_PREFERENCES_PROFILE_SUFFIX=".profile.dat"
+PROTON_PREFERENCES_PROFILE_SUFFIX=".preferences.user.reg"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
 
 if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
@@ -376,18 +376,23 @@ show_help() {
     echo "  $0 native-1440p-ultra-rt-off native-4k-high-rt-off"
     echo ""
     echo "PROFILE FILES:"
-    echo "  Shadow of the Tomb Raider native preferences profile format:"
+    echo "  Native launch mode:"
     echo "    profiles/{TEST_NAME}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
-    echo "  Example: profiles/native-4k-high-rt-off${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+    echo "    Example: profiles/native-4k-high-rt-off${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+    echo "  Proton launch mode:"
+    echo "    profiles/{TEST_NAME}${PROTON_PREFERENCES_PROFILE_SUFFIX}"
+    echo "    Example: profiles/proton-dx12-off-dlss-ultra-performance-4k-high${PROTON_PREFERENCES_PROFILE_SUFFIX}"
     echo ""
 }
 
 validate_profiles() {
     local missing_count=0
+    local required_suffix="$NATIVE_PREFERENCES_PROFILE_SUFFIX"
+    local profile_kind="native preferences"
 
     if [[ "$SOTTR_LAUNCH_MODE" == "proton" ]]; then
-        log_info "Launch mode is proton; native preferences profile validation is skipped."
-        return 0
+        required_suffix="$PROTON_PREFERENCES_PROFILE_SUFFIX"
+        profile_kind="proton preferences"
     fi
 
     if [[ ! -d "$PROFILES_DIR" ]]; then
@@ -397,19 +402,19 @@ validate_profiles() {
 
     log_info "Validating profile files in $PROFILES_DIR ..."
     for test_name in "${!TESTS[@]}"; do
-        local native_preferences_profile_file="${PROFILES_DIR}/${test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
-        if [[ ! -f "$native_preferences_profile_file" ]]; then
-            log_warning "Missing: ${test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+        local profile_file="${PROFILES_DIR}/${test_name}${required_suffix}"
+        if [[ ! -f "$profile_file" ]]; then
+            log_warning "Missing: ${test_name}${required_suffix}"
             missing_count=$((missing_count + 1))
         fi
     done
 
     if [[ $missing_count -eq 0 ]]; then
-        log_success "Profile validation passed: all native preferences profiles exist."
+        log_success "Profile validation passed: all ${profile_kind} profiles exist."
         return 0
     fi
 
-    log_error "Profile validation failed: ${missing_count} missing native preferences profile file(s)."
+    log_error "Profile validation failed: ${missing_count} missing ${profile_kind} profile file(s)."
     return 1
 }
 
@@ -652,25 +657,29 @@ apply_native_preferences_profile() {
 }
 
 resolve_proton_profile_file() {
-    if [[ -n "${PROTON_PROFILE_FILE:-}" && -f "$PROTON_PROFILE_FILE" ]]; then
-        return 0
+    if [[ -n "${PROTON_PROFILE_FILE:-}" ]]; then
+        if [[ -f "$PROTON_PROFILE_FILE" || -d "$(dirname "$PROTON_PROFILE_FILE")" ]]; then
+            return 0
+        fi
     fi
 
-    local -a proton_documents_candidates=(
-        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider"
-        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider"
-        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider"
-        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider"
+    local -a proton_profile_candidates=(
+        "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/user.reg"
+        "${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/user.reg"
+        "${STEAM_ROOT}/steamapps/compatdata/${GAME_ID}/pfx/user.reg"
     )
 
-    local candidate_dir
-    for candidate_dir in "${proton_documents_candidates[@]}"; do
-        [[ -d "$candidate_dir" ]] || continue
+    local candidate_profile
+    for candidate_profile in "${proton_profile_candidates[@]}"; do
+        if [[ -f "$candidate_profile" ]]; then
+            PROTON_PROFILE_FILE="$candidate_profile"
+            return 0
+        fi
+    done
 
-        local detected_profile_file=""
-        detected_profile_file="$(find "$candidate_dir" -maxdepth 2 -type f -path '*/[0-9]*/profile.dat' 2>/dev/null | head -n1)"
-        if [[ -n "$detected_profile_file" ]]; then
-            PROTON_PROFILE_FILE="$detected_profile_file"
+    for candidate_profile in "${proton_profile_candidates[@]}"; do
+        if [[ -d "$(dirname "$candidate_profile")" ]]; then
+            PROTON_PROFILE_FILE="$candidate_profile"
             return 0
         fi
     done
@@ -694,7 +703,7 @@ apply_proton_preferences_profile() {
     fi
 
     if ! resolve_proton_profile_file; then
-        log_to_file warning "$log" "Proton target profile.dat not found under compatdata/${GAME_ID}; skipping Proton profile copy."
+        log_to_file warning "$log" "Proton target user.reg not found under compatdata/${GAME_ID}/pfx; skipping Proton profile copy."
         return 0
     fi
 
@@ -716,6 +725,7 @@ apply_proton_preferences_profile() {
 # $6 - log file, for logging errors and info
 # $7 - output array name for launch args, passed by reference
 # $8 - optional test name for profile matching (preferred method), if not provided will fallback to parameter-based naming
+# $9 - optional effective launch mode (native|proton)
 apply_setting() {
     local mode=$1
     local resolution=$2
@@ -725,7 +735,15 @@ apply_setting() {
     local log=$6
     local output_array_name=$7
     local test_name=${8:-""}
+    local effective_launch_mode=${9:-${SOTTR_LAUNCH_MODE:-native}}
     local -n launch_args_ref="$output_array_name"
+
+    local profile_suffix="$NATIVE_PREFERENCES_PROFILE_SUFFIX"
+    local profile_kind="native preferences"
+    if [[ "$effective_launch_mode" == "proton" ]]; then
+        profile_suffix="$PROTON_PREFERENCES_PROFILE_SUFFIX"
+        profile_kind="proton preferences"
+    fi
 
     local original_mode="$mode"
     # Validate mode and extract base mode for profile matching
@@ -800,9 +818,14 @@ apply_setting() {
     # Log the applied settings for reference
     log_to_file info "$log" "Applied settings => mode=$original_mode resolution=$resolution quality=$quality_preset ray_tracing=$ray_tracing frame_generation=$frame_generation"
     if [[ -n "$test_name" ]]; then
-        log_to_file info "$log" "Native preferences profile key: test name ($test_name)"
+        local expected_profile_file="${PROFILES_DIR}/${test_name}${profile_suffix}"
+        log_to_file info "$log" "${profile_kind^} profile key: test name ($test_name)"
+        log_to_file info "$log" "Expected ${profile_kind} profile: $expected_profile_file"
+        if [[ ! -f "$expected_profile_file" ]]; then
+            log_to_file warning "$log" "${profile_kind^} profile file is missing: $expected_profile_file"
+        fi
     else
-        log_to_file info "$log" "Native preferences profile key: parameter-based"
+        log_to_file info "$log" "${profile_kind^} profile key: parameter-based"
     fi
     return 0
 }
@@ -984,7 +1007,7 @@ run_bench() {
     
     local -a launch_args
 
-    apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" || return 1
+    apply_setting "$mode" "$res" "$quality_preset" "$ray_tracing" "$frame_generation" "$log" launch_args "$test_name" "$launch_mode" || return 1
     if [[ "$launch_mode" == "native" ]]; then
         apply_native_preferences_profile "$test_name" "$log"
     else
