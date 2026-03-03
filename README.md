@@ -18,6 +18,9 @@ Automation and documentation for game benchmarking workflows on Linux.
 - Cyberpunk 2077 benchmark manual:
 	- [games/cyberpunk 2077/README.md](games/cyberpunk%202077/README.md)
 
+- Shadow of the Tomb Raider benchmark manual:
+	- [games/tomb raider/README.md](games/tomb%20raider/README.md)
+
 This includes usage, test/group behavior, profile requirements, result/report formats, and troubleshooting notes for Cyberpunk 2077.
 
 ## Python setup (report converter)

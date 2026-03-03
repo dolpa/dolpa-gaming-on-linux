@@ -18,6 +18,7 @@ PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 SYSTEM_CONFIG_OVERRIDE_FILE="${CP2077_BENCHMARK_CONFIG:-}"
+CP2077_PROTON_VERSION_DEFAULT="GE-Proton9-27"
 
 # Built-in defaults (can be overridden by config files below)
 GAME_ID=1091500
@@ -26,7 +27,6 @@ STEAM_ROOT="${HOME}/.steam/root"
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
 ENABLE_MANGOHUD=1
 ENABLE_GAMEMODERUN=0
-PROTON_VERSION="GE-Proton10-25"
 BENCHMARK_TIMEOUT_MINUTES=15
 BENCHMARK_TIMEOUT_SECONDS=""
 BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30
@@ -47,6 +47,12 @@ if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$SYSTEM_CONFIG_OVERRIDE_FILE"
 fi
+
+# Proton selection precedence:
+# 1) CP2077_PROTON_VERSION (game-specific override)
+# 2) PROTON_VERSION (shared system default)
+# 3) CP2077_PROTON_VERSION_DEFAULT (game fallback)
+PROTON_VERSION="${CP2077_PROTON_VERSION:-${PROTON_VERSION:-$CP2077_PROTON_VERSION_DEFAULT}}"
 
 if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
     BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
@@ -746,23 +752,33 @@ run_bench() {
         return 1
     fi
 
-    timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s" \
-        env \
-        "SteamAppId=${GAME_ID}" \
-        "SteamGameId=${GAME_ID}" \
-        "PROTON_VERB=waitforexitandrun" \
-        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH" \
-        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID" \
-        "STEAM_RUNTIME=1" \
-        "PROTON_LOG=1" \
-        "VKD3D_FEATURE_LEVEL=12_0" \
-        "${proton_run_cmd[@]}" run \
-        "$exe_path" \
-        --launcher-skip \
-        --intro-skip \
-        "${launch_args[@]}" \
-        -benchmark \
-        >>"$log" 2>&1
+    local -a full_launch_cmd=(
+        timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
+        env
+        "SteamAppId=${GAME_ID}"
+        "SteamGameId=${GAME_ID}"
+        "PROTON_VERB=waitforexitandrun"
+        "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
+        "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
+        "STEAM_RUNTIME=1"
+        "PROTON_LOG=1"
+        "VKD3D_FEATURE_LEVEL=12_0"
+        "${proton_run_cmd[@]}" run
+        "$exe_path"
+        --launcher-skip
+        --intro-skip
+        "${launch_args[@]}"
+        -benchmark
+    )
+
+    local full_launch_cmd_pretty=""
+    printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
+    log_to_file info "$log" "Full launch command: cd $(printf '%q' "$game_path") && ${full_launch_cmd_pretty% }"
+
+    (
+        cd "$game_path" || exit 1
+        "${full_launch_cmd[@]}"
+    ) >>"$log" 2>&1
     
     local exit_code=$?
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then

@@ -10,21 +10,29 @@ SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; 
 if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
 	SYSTEM_NAME_DEFAULT="default"
 fi
-SYSTEM_NAME="${CP2077_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${SOTTR_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
 SYSTEM_NAME="${SYSTEM_NAME// /_}"
 
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
-SYSTEM_CONFIG_OVERRIDE_FILE="${CP2077_BENCHMARK_CONFIG:-}"
-CP2077_PROTON_VERSION_DEFAULT="GE-Proton9-27"
+SYSTEM_CONFIG_OVERRIDE_FILE="${SOTTR_BENCHMARK_CONFIG:-}"
+SOTTR_PROTON_VERSION_DEFAULT="GE-Proton9-27"
+GAME_ID=750920
+STEAM_PATH="${HOME}/.local/share/Steam"
+CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
 
 RESULTS_DIR="${SCRIPT_DIR}/results"
 PROFILES_DIR="${SCRIPT_DIR}/profiles"
-TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
-GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
-TEMPLATE_FILE="${RESULTS_DIR}/cp2077_benchmark_report_template.md"
-LATEST_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report.md"
-TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/cp2077_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
+NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
+TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+TESTS_CONFIG_NATIVE_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+TESTS_CONFIG_PROTON_FILE="${SCRIPT_DIR}/config/tests.proton.conf.sh"
+GROUPS_CONFIG_NATIVE_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+GROUPS_CONFIG_PROTON_FILE="${SCRIPT_DIR}/config/groups.proton.conf.sh"
+TEMPLATE_FILE="${RESULTS_DIR}/sottr_benchmark_report_template.md"
+LATEST_REPORT_FILE="${RESULTS_DIR}/sottr_benchmark_report.md"
+TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/sottr_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
 BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
 GAME_README_FILE="${SCRIPT_DIR}/../README.md"
 TEST_RESULTS_START_MARKER="<!-- TEST_RESULTS_START -->"
@@ -38,7 +46,7 @@ fi
 
 if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
 	if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
-		echo "Error: CP2077_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+		echo "Error: SOTTR_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
 		exit 1
 	fi
 	# shellcheck source=/dev/null
@@ -46,10 +54,10 @@ if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
 fi
 
 # Proton selection precedence:
-# 1) CP2077_PROTON_VERSION (game-specific override)
-# 2) PROTON_VERSION (shared system default)
-# 3) CP2077_PROTON_VERSION_DEFAULT (game fallback)
-PROTON_VERSION="${CP2077_PROTON_VERSION:-${PROTON_VERSION:-$CP2077_PROTON_VERSION_DEFAULT}}"
+# 1) SOTTR_PROTON_VERSION (game-specific override)
+# 2) SOTTR_PROTON_VERSION_DEFAULT (game default)
+# 3) PROTON_VERSION (shared system default)
+PROTON_VERSION="${SOTTR_PROTON_VERSION:-${SOTTR_PROTON_VERSION_DEFAULT:-${PROTON_VERSION:-}}}"
 
 REPORT_SYSTEM_OS="${REPORT_SYSTEM_OS:-Ubuntu 24.04.4 LTS}"
 REPORT_SYSTEM_KERNEL="${REPORT_SYSTEM_KERNEL:-6.17.0-14-generic}"
@@ -59,6 +67,28 @@ REPORT_SYSTEM_GPU_DRIVER="${REPORT_SYSTEM_GPU_DRIVER:-NVIDIA 590.48.01}"
 REPORT_SYSTEM_RAM="${REPORT_SYSTEM_RAM:-48 GB}"
 REPORT_SYSTEM_PROTON="${REPORT_SYSTEM_PROTON:-${PROTON_VERSION:-}}"
 
+if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
+	local_native_results_dir="${HOME}/.local/share/feral-interactive/Shadow of the Tomb Raider/SaveData"
+	local_proton_results_dir="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+	local_proton_results_dir_alt="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+	local_steam_results_dir="${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Shadow of the Tomb Raider/"
+	local_steam_results_dir_alt="${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Shadow of the Tomb Raider/"
+
+	if [[ -d "$local_native_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+	elif [[ -d "$local_proton_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir"
+	elif [[ -d "$local_proton_results_dir_alt" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir_alt"
+	elif [[ -d "$local_steam_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_steam_results_dir"
+	elif [[ -d "$local_steam_results_dir_alt" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_steam_results_dir_alt"
+	else
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+	fi
+fi
+
 if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
 	echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
 	exit 1
@@ -67,12 +97,20 @@ fi
 # shellcheck source=/dev/null
 source "$BASH_UTILS_LOADER"
 
-if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
+if [[ -f "$TESTS_CONFIG_NATIVE_FILE" ]]; then
+	TESTS_CONFIG_FILE="$TESTS_CONFIG_NATIVE_FILE"
+elif [[ -f "$LEGACY_TESTS_CONFIG_FILE" ]]; then
+	TESTS_CONFIG_FILE="$LEGACY_TESTS_CONFIG_FILE"
+elif [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
 	log_error "Tests config file not found: $TESTS_CONFIG_FILE"
 	exit 1
 fi
 
-if [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
+if [[ -f "$GROUPS_CONFIG_NATIVE_FILE" ]]; then
+	GROUPS_CONFIG_FILE="$GROUPS_CONFIG_NATIVE_FILE"
+elif [[ -f "$LEGACY_GROUPS_CONFIG_FILE" ]]; then
+	GROUPS_CONFIG_FILE="$LEGACY_GROUPS_CONFIG_FILE"
+elif [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
 	log_error "Test groups config file not found: $GROUPS_CONFIG_FILE"
 	exit 1
 fi
@@ -91,8 +129,18 @@ source "$TESTS_CONFIG_FILE"
 # shellcheck source=/dev/null
 source "$GROUPS_CONFIG_FILE"
 
+if [[ -f "$TESTS_CONFIG_PROTON_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$TESTS_CONFIG_PROTON_FILE"
+fi
+
+if [[ -f "$GROUPS_CONFIG_PROTON_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$GROUPS_CONFIG_PROTON_FILE"
+fi
+
 show_help() {
-	echo "Cyberpunk 2077 Benchmark Results Analyzer"
+	echo "Tomb Raider Benchmark Results Analyzer"
 	echo "Usage: $0 [OPTIONS] [TEST_NAME ...]"
 	echo
 	echo "OPTIONS:"
@@ -108,8 +156,9 @@ show_help() {
 	echo
 	echo "Examples:"
 	echo "  $0"
-	echo "  $0 --group quick-4k"
-	echo "  $0 --group quick-4k dlss-quality-4k-high-rt-on"
+	echo "  $0 --group native-quick"
+	echo "  $0 --group proton-quick"
+	echo "  $0 --group native-4k-scaling native-4k-high-rt-off"
 }
 
 list_tests() {
@@ -212,9 +261,9 @@ augment_tests_with_fg_variants() {
 
 		for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
 			local fg_test_name="${base_test_name}-${fg_suffix}"
-			local fg_profile_file="${PROFILES_DIR}/UserSettings.${fg_test_name}.json"
+			local fg_profile_file_rise="${PROFILES_DIR}/${fg_test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
 
-			if [[ -f "$fg_profile_file" && -z "${TESTS[$fg_test_name]+isset}" ]]; then
+			if [[ -f "$fg_profile_file_rise" && -z "${TESTS[$fg_test_name]+isset}" ]]; then
 				read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$base_test_name]}"
 				case "$fg_suffix" in
 					fg-dlss)
@@ -250,6 +299,43 @@ try:
 except Exception:
 	print("||")
 PY
+}
+
+extract_fps_triplet_from_txt() {
+	local txt_file="$1"
+	local benchmark_text_stream=""
+
+	if command -v strings >/dev/null 2>&1; then
+		benchmark_text_stream="$(strings -a "$txt_file")"
+	else
+		benchmark_text_stream="$(tr -cd '\11\12\15\40-\176' < "$txt_file")"
+	fi
+
+	local min_fps max_fps avg_fps
+	min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Min FPS:/{print $3; exit}')"
+	max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Max FPS:/{print $3; exit}')"
+	avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Average FPS:/{print $3; exit}')"
+
+	if [[ -z "$min_fps" || -z "$max_fps" || -z "$avg_fps" ]]; then
+		min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Min FPS:/{print $3; exit}')"
+		max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Max FPS:/{print $3; exit}')"
+		avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average FPS:/{print $3; exit}')"
+	fi
+
+	if [[ -n "$min_fps" && -n "$avg_fps" && -n "$max_fps" ]]; then
+		printf '%s|%s|%s\n' "$min_fps" "$avg_fps" "$max_fps"
+	else
+		echo "||"
+	fi
+}
+
+extract_timestamp_from_native_txt_name() {
+	local file_name="$1"
+	if [[ "$file_name" =~ _([0-9]{4})-([0-9]{2})-([0-9]{2})_([0-9]{2})\.([0-9]{2})\.([0-9]{2})\.txt$ ]]; then
+		echo "${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}_${BASH_REMATCH[4]}${BASH_REMATCH[5]}${BASH_REMATCH[6]}"
+	else
+		echo ""
+	fi
 }
 
 join_unique_values() {
@@ -307,7 +393,8 @@ write_report_header() {
 		echo "# ${title}"
 		echo
 		echo "- Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
-		echo "- Source directory: ${RESULTS_DIR}"
+		echo "- JSON archive directory: ${RESULTS_DIR}"
+		echo "- Benchmark source directory: ${BENCHMARK_RESULTS_SOURCE_DIR}"
 		echo "- Mode: ${mode_label}"
 		echo "- OS: ${REPORT_SYSTEM_OS}"
 		echo "- KERNEL: ${REPORT_SYSTEM_KERNEL}"
@@ -381,10 +468,10 @@ ensure_test_results_section_exists() {
 		echo
 		echo "Latest report files:"
 		echo
-		echo "- [benchmark/results/cp2077_benchmark_report_template.md](benchmark/results/cp2077_benchmark_report_template.md)"
-		echo "- [benchmark/results/cp2077_benchmark_report.md](benchmark/results/cp2077_benchmark_report.md)"
+		echo "- [benchmark/results/sottr_benchmark_report_template.md](benchmark/results/sottr_benchmark_report_template.md)"
+		echo "- [benchmark/results/sottr_benchmark_report.md](benchmark/results/sottr_benchmark_report.md)"
 		echo
-		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_cp2077_results.sh\\`):"
+		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_sottr_results.sh\\`):"
 		echo
 		echo "$TEST_RESULTS_START_MARKER"
 		echo "$TEST_RESULTS_PLACEHOLDER"
@@ -447,7 +534,7 @@ register_all_snapshot_report_links_in_readme() {
 	local -a sorted_snapshot_files
 	local -A seen_snapshot_basenames=()
 	shopt -s nullglob
-	snapshot_files=("${RESULTS_DIR}"/cp2077_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
+	snapshot_files=("${RESULTS_DIR}"/sottr_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
 	shopt -u nullglob
 
 	local links_file
@@ -510,81 +597,7 @@ register_all_snapshot_report_links_in_readme() {
 	log_success "Synchronized snapshot report links in README (newest first, no duplicates)."
 }
 
-build_quick_resolution_variant_groups() {
-	add_test_and_rt_pair_if_available() {
-		local target_array_name="$1"
-		local mapped_test_name="$2"
-
-		if [[ -z "${TESTS[$mapped_test_name]+isset}" ]]; then
-			return
-		fi
-
-		eval "$target_array_name+=(\"$mapped_test_name\")"
-
-		local counterpart_test_name=""
-		if [[ "$mapped_test_name" == *-rt-off* ]]; then
-			counterpart_test_name="${mapped_test_name/-rt-off/-rt-on}"
-		elif [[ "$mapped_test_name" == *-rt-on* ]]; then
-			counterpart_test_name="${mapped_test_name/-rt-on/-rt-off}"
-		fi
-
-		if [[ -n "$counterpart_test_name" && -n "${TESTS[$counterpart_test_name]+isset}" ]]; then
-			eval "$target_array_name+=(\"$counterpart_test_name\")"
-		fi
-	}
-
-	local source_group_name
-	for source_group_name in "${!TEST_GROUPS[@]}"; do
-		[[ "$source_group_name" == 4k-quick-* ]] || continue
-
-		local group_suffix="${source_group_name#4k-quick-}"
-		local target_group_1080p="1080p-quick-${group_suffix}"
-		local target_group_1440p="1440p-quick-${group_suffix}"
-
-		read -ra source_tests <<<"${TEST_GROUPS[$source_group_name]}"
-
-		local -a mapped_1080p_tests=()
-		local -a mapped_1440p_tests=()
-		local -A seen_1080p_tests=()
-		local -A seen_1440p_tests=()
-		local source_test mapped_test
-
-		for source_test in "${source_tests[@]}"; do
-			mapped_test="${source_test//-4k-/-1080p-}"
-			add_test_and_rt_pair_if_available "mapped_1080p_tests" "$mapped_test"
-
-			mapped_test="${source_test//-4k-/-1440p-}"
-			add_test_and_rt_pair_if_available "mapped_1440p_tests" "$mapped_test"
-		done
-
-		local -a deduped_1080p_tests=()
-		for mapped_test in "${mapped_1080p_tests[@]}"; do
-			if [[ -z "${seen_1080p_tests[$mapped_test]+isset}" ]]; then
-				deduped_1080p_tests+=("$mapped_test")
-				seen_1080p_tests["$mapped_test"]=1
-			fi
-		done
-
-		local -a deduped_1440p_tests=()
-		for mapped_test in "${mapped_1440p_tests[@]}"; do
-			if [[ -z "${seen_1440p_tests[$mapped_test]+isset}" ]]; then
-				deduped_1440p_tests+=("$mapped_test")
-				seen_1440p_tests["$mapped_test"]=1
-			fi
-		done
-
-		if [[ ${#deduped_1080p_tests[@]} -gt 0 ]]; then
-			TEST_GROUPS["$target_group_1080p"]="${deduped_1080p_tests[*]}"
-		fi
-
-		if [[ ${#deduped_1440p_tests[@]} -gt 0 ]]; then
-			TEST_GROUPS["$target_group_1440p"]="${deduped_1440p_tests[*]}"
-		fi
-	done
-}
-
 augment_tests_with_fg_variants
-build_quick_resolution_variant_groups
 parse_arguments "$@"
 select_tests_for_report
 
@@ -624,7 +637,62 @@ for result_file in "${result_files[@]}"; do
 	fi
 done
 
+if [[ -z "${LATEST_RESULT_FILE_BY_KEY[*]-}" ]]; then
+	mapfile -t sorted_native_summary_txt < <(
+		find "$RESULTS_DIR" -maxdepth 1 -type f -name 'Shadow of the Tomb Raider_benchmarkresults_*.txt' ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null | sort -n | cut -d' ' -f2-
+	)
+
+	if [[ ${#sorted_native_summary_txt[@]} -gt 0 ]]; then
+		if [[ ${#sorted_native_summary_txt[@]} -lt ${#SELECTED_TESTS[@]} ]]; then
+			log_warning "Native TXT fallback: only ${#sorted_native_summary_txt[@]} benchmark summary files for ${#SELECTED_TESTS[@]} selected tests."
+		fi
+
+		start_index=0
+		if [[ ${#sorted_native_summary_txt[@]} -gt ${#SELECTED_TESTS[@]} ]]; then
+			start_index=$(( ${#sorted_native_summary_txt[@]} - ${#SELECTED_TESTS[@]} ))
+		fi
+
+		for idx in "${!SELECTED_TESTS[@]}"; do
+			source_idx=$((start_index + idx))
+			if [[ $source_idx -ge ${#sorted_native_summary_txt[@]} ]]; then
+				break
+			fi
+
+			test_name="${SELECTED_TESTS[$idx]}"
+			txt_file="${sorted_native_summary_txt[$source_idx]}"
+			fps_triplet="$(extract_fps_triplet_from_txt "$txt_file")"
+			IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
+
+			if [[ -z "$min_fps" || -z "$avg_fps" || -z "$max_fps" ]]; then
+				continue
+			fi
+
+			result_timestamp="$(extract_timestamp_from_native_txt_name "$(basename "$txt_file")")"
+			if [[ -z "$result_timestamp" ]]; then
+				result_timestamp="19700101_000000"
+			fi
+
+			result_key="${test_name}|unknown-gpu|unknown-vram|unknown-driver"
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$txt_file"
+			LATEST_MIN_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$min_fps")"
+			LATEST_AVG_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$avg_fps")"
+			LATEST_MAX_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$max_fps")"
+		done
+
+		mapped_count=0
+		for _result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+			mapped_count=$((mapped_count + 1))
+		done
+		log_info "Native TXT fallback applied: mapped ${mapped_count} benchmark summary files to selected tests."
+	fi
+fi
+
 for result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+	if [[ -n "${LATEST_MIN_FPS_BY_KEY[$result_key]+isset}" && -n "${LATEST_AVG_FPS_BY_KEY[$result_key]+isset}" && -n "${LATEST_MAX_FPS_BY_KEY[$result_key]+isset}" ]]; then
+		continue
+	fi
+
 	fps_triplet="$(extract_fps_triplet "${LATEST_RESULT_FILE_BY_KEY[$result_key]}")"
 	IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
 
@@ -640,10 +708,10 @@ REPORT_GPU_VRAMS="N/A"
 REPORT_GPU_DRIVERS="N/A"
 collect_selected_gpu_metadata
 
-write_report_header "$TEMPLATE_FILE" "Cyberpunk 2077 Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+write_report_header "$TEMPLATE_FILE" "Shadow of the Tomb Raider Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 total_tests="$(append_template_rows "$TEMPLATE_FILE")"
 
-write_report_header "$LATEST_REPORT_FILE" "Cyberpunk 2077 Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+write_report_header "$LATEST_REPORT_FILE" "Shadow of the Tomb Raider Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
 filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
 cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
 register_all_snapshot_report_links_in_readme
