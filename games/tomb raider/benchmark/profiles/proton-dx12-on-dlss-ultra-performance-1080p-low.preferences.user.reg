@@ -278,8 +278,8 @@ WINE REGISTRY Version 2
 "TrapAwareness"=dword:00000001
 "TrapAwarenessIntensity"=dword:000001f4
 
-[Software\\Eidos Montreal\\Shadow of the Tomb Raider\\Graphics] 1772481766
-#time=1dcaa7f899b1d10
+[Software\\Eidos Montreal\\Shadow of the Tomb Raider\\Graphics] 1772484174
+#time=1dcaa8525023a40
 "AA"=dword:00000000
 "AAPrevious"=dword:00000002
 "AmbientOcclusionQuality"=dword:00000000
@@ -307,7 +307,7 @@ WINE REGISTRY Version 2
 "HDRScale"=dword:000003e8
 "HighPrecisionRT"=dword:00000001
 "IsBezelCorrected"=dword:00000000
-"LensFlares"=dword:00000000
+"LensFlares"=dword:00000001
 "LevelOfDetail"=dword:00000001
 "MaxFrameLatency"=dword:00000000
 "MaxMultiGPUCount"=dword:00000004
@@ -319,7 +319,7 @@ WINE REGISTRY Version 2
 "RefreshRate"=dword:0000003c
 "ResolutionModifier"=dword:000003e8
 "RTDenoiseMethod"=dword:00000000
-"ScreenEffects"=dword:00000000
+"ScreenEffects"=dword:00000001
 "ScreenSpaceContactShadows"=dword:00000000
 "ScreenSpaceReflections"=dword:00000000
 "ShadowQuality"=dword:00000001
@@ -1079,8 +1079,8 @@ WINE REGISTRY Version 2
 #time=1dca9ad8a622888
 "guid"=hex:21,d2,a7,99,ed,61,af,46,b9,9d,08,13,6e,31,d8,0c
 
-[Software\\Wine\\Fonts] 1772481716
-#time=1dcaa7f6beca48c
+[Software\\Wine\\Fonts] 1772484129
+#time=1dcaa850a5e053e
 "Codepages"="1252,437"
 "LogPixels"=dword:00000060
 
