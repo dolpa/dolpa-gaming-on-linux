@@ -39,3 +39,17 @@
 | proton-dx12-off-dlss-ultra-performance-4k-high | dlss-ultra-performance | 3840x2160 | high | off | off off | nvidia-geforce-rtx-5060 | 8151mb | 590.48.01 | 0.00 | 8.10 | 9.80 |
 | proton-dx12-on-dlss-ultra-performance-4k-ultra | dlss-ultra-performance | 3840x2160 | ultra | off | off on | nvidia-geforce-rtx-5060 | 8151mb | 590.48.01 | 0.00 | 5.50 | 9.20 |
 | proton-dx12-off-dlss-ultra-performance-4k-ultra | dlss-ultra-performance | 3840x2160 | ultra | off | off off | nvidia-geforce-rtx-5060 | 8151mb | 590.48.01 | 0.00 | 10.10 | 22.80 |
+
+## Graphical Results
+
+All resolutions:
+![Average FPS chart](./sottr_benchmark_report_20260303_072138_avg_fps_all.png)
+
+1080p resolution:
+![Average FPS chart](./sottr_benchmark_report_20260303_072138_avg_fps_1920x1080.png)
+
+1440p resolution:
+![Average FPS chart](./sottr_benchmark_report_20260303_072138_avg_fps_2560x1440.png)
+
+4k resolution:
+![Average FPS chart](./sottr_benchmark_report_20260303_072138_avg_fps_3840x2160.png)
