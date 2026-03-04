@@ -150,6 +150,11 @@ timeout --foreground --signal=TERM --kill-after=20s 600s \
 	PROTON_LOG=1 \
 	SteamAppId="$GAME_ID" \
 	SteamGameId="$GAME_ID" \
+    VKD3D_FEATURE_LEVEL=12_2 \
+    PROTON_HIDE_NVIDIA_GPU=0 \
+    PROTON_ENABLE_NVAPI=1 \
+    VKD3D_CONFIG=dxr12 \
+    DXVK_ASYNC=1 \
 	"$PROTON_BIN" run "$GAME_EXE" \
 	-benchmark "$BENCHMARK" \
 	-bench_output 0 \
