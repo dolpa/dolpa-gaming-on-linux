@@ -8,3 +8,4 @@ games/tomb raider/benchmark/logs/rottr_benchmark_*_*.txt
 games/tomb raider/benchmark/logs/sottr_benchmark_*_*.txt
 games/tomb raider/benchmark/results/Shadow of the Tomb Raider_benchmarkresults_*.txt
 games/tomb raider/benchmark/results/750920_result_*.json
+games/deusex md/benchmark/logs/deusex_md_benchmark_*.txt
