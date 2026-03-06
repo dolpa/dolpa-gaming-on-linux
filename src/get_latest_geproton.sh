@@ -43,10 +43,11 @@ LATEST_GEPROTON_VERSION=$(echo "$LATEST_GEPROTON_DATA" | jq -r ".tag_name")
 log_info "Latest GE-Proton version: $LATEST_GEPROTON_VERSION"
 log_info "Current GE-Proton for this system: ${SYSTEM_NAME} is: ${PROTON_VERSION}"
 
-if [[ -f "${PROTON_DIR}/${LATEST_GEPROTON_VERSION}" ]]; then
+if [[ -d "${PROTON_DIR}/${LATEST_GEPROTON_VERSION}" ]]; then
     log_success "Latest GE-Proton version is already installed: ${LATEST_GEPROTON_VERSION}"
+    exit 0
 else
-    log_info "Latest GE-Proton version ${LATEST_GEPROTON_VERSION} is not installed in ${PROTON_DIR}"
+    log_warning "Latest GE-Proton version ${LATEST_GEPROTON_VERSION} is not installed in ${PROTON_DIR}"
 fi
 
 if [[ "$PROTON_VERSION" != "$LATEST_GEPROTON_VERSION" ]]; then
@@ -93,6 +94,13 @@ if [[ "$PROTON_VERSION" != "$LATEST_GEPROTON_VERSION" ]]; then
         echo -n "Extracting: ["
         tar -xzf "/tmp/${LATEST_GEPROTON_VERSION}.tar.gz" --checkpoint=$CHECKPOINT --checkpoint-action='ttyout=*' -C "${PROTON_DIR}/"
         echo "]"
+        if [[ $? -ne 0 ]]; then
+            log_error "Error: Failed to extract GE-Proton archive!" >&2
+            exit 1
+        else
+            log_success "GE-Proton version ${LATEST_GEPROTON_VERSION} installed successfully in ${PROTON_DIR}"
+            exit 0
+        fi
 
     fi
 else
