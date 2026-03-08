@@ -149,21 +149,16 @@ trap cleanup EXIT
 # AUTO_PRESS_PID=$!
 
 timeout --foreground --signal=TERM --kill-after=20s 600s \
-	echo env \
-	PROTON_LOG=1 \
+	env PROTON_LOG=1 \
 	SteamAppId="$GAME_ID" \
 	SteamGameId="$GAME_ID" \
-    VKD3D_FEATURE_LEVEL=12_2 \
-    PROTON_HIDE_NVIDIA_GPU=0 \
-    PROTON_ENABLE_NVAPI=1 \
-    VKD3D_CONFIG=dxr12 \
-    DXVK_ASYNC=1 \
-	"$PROTON_BIN" run "$GAME_EXE" \
-	-benchmark 
-	# "$BENCHMARK" \
-	# -bench_output 0 \
-	# -bench_runs "$BENCHMARK_RUNS" \
-	# -bench_track "$BENCHMARK_TRACK" \
-	# -bench_preset_name "$BENCHMARK_PRESET" \
-	# -bench_ui \
-	# -bench_options
+	VKD3D_FEATURE_LEVEL=12_2 \
+	PROTON_HIDE_NVIDIA_GPU=0 \
+	PROTON_ENABLE_NVAPI=1 \
+	VKD3D_CONFIG=dxr12 \
+	DXVK_ASYNC=1 \
+	"$HOME/.local/share/Steam/compatibilitytools.d/GE-Proton10-32/proton" \
+	run "/mnt/Data/Games/Steam/steamapps/common/Assassin's Creed Valhalla/ACValhalla.exe" \
+	-uplay_steam_mode \
+	-benchmark \
+	-skipStartScreen
