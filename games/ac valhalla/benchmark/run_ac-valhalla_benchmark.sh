@@ -14,7 +14,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"      # directory where this script lives (used for locating configs, logs, …)
 PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"        # root of the project (used for locating the shared bash‑utils library, and as a base for system‑specific configs)
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"                  # directory where system‑specific configuration files are expected to live (e.g. system.my‑pc.conf.sh)
-SYSTEM_NAME_DEFAULT=""                                          # default system name (can be overridden by the local config); if empty, it will be derived from the hostname
+SYSTEM_NAME_DEFAULT=${SYSTEM_NAME:-"default"}                                         # default system name (can be overridden by the local config); if empty, it will be derived from the hostname
 GAME_SHORT_NAME="ac-valhalla"                                   # short name for the game (used for folder names, logs, …); should be lowercase and contain only letters, numbers and dashes/underscores
 
 
@@ -43,6 +43,7 @@ PROTON_VERSION_DEFAULT="GE-Proton10-32"  # default Proton version to use for the
 # Game/Steam identifiers
 GAME_ID=2208920                             # Steam AppID for Assassin’s Creed Valhalla
 GAME_NAME="Assassin’s Creed Valhalla"       # Human‑friendly game name (used for logging, folder names, …)
+GAME_CREATOR_STUDIO="Ubisoft"               # Creator studio name (used for folder paths in the user settings and benchmark results)
 STEAM_PATH="${HOME}/.local/share/Steam"     # Base path to Steam (used for Proton, compatdata, …)
 STEAM_ROOT="${HOME}/.steam/root"            # Steam root path
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam" # Custom Steam library path (where the game is installed) – override in config if needed
@@ -59,16 +60,17 @@ USER_SETTINGS_FOLDER=""
 BENCHMARK_RESULTS_SOURCE_DIR=""
 BENCHMARK_RESULTS_OUTPUT_DIR="${SCRIPT_DIR}/results"
 
-
-
 # --------------------------------------------------------------------
-#  Check for the shared bash‑utils library (must be done before loading configs, as they may rely on it for logging, GPU detection, etc.)
+#  Load the shared bash‑utils library (provides logging helpers, Bash utilities, …)
 # --------------------------------------------------------------------
+echo $SCRIPT_DIR
 BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
-if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
-    echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
+if [[ ! -f "${BASH_UTILS_LOADER}" ]]; then
+    echo "Error: dolpa‑bash‑utils loader not found: ${BASH_UTILS_LOADER}" >&2
     exit 1
 fi
+# shellcheck source=/dev/null
+source "${BASH_UTILS_LOADER}"
 
 # --------------------------------------------------------------------
 #  Load system configuration files (they may overwrite the defaults)
@@ -105,24 +107,13 @@ fi
 
 # Default user‑settings folder (Steam‑Play “compatdata” path)
 if [[ -z "${USER_SETTINGS_FOLDER:-}" ]]; then
-    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/Ubisoft/Assassin's Creed Valhalla"
+    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/${GAME_CREATOR_STUDIO}${GAME_NAME}/"
 fi
 
 # Default benchmark results source directory (where the game writes its CSVs)
 if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
-    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Ubisoft/Assassin's Creed Valhalla/benchmarkResults/"
+    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
 fi
-
-# --------------------------------------------------------------------
-#  Load the shared bash‑utils library (provides logging helpers, GPU detection, …)
-# --------------------------------------------------------------------
-BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
-if [[ ! -f "${BASH_UTILS_LOADER}" ]]; then
-    echo "Error: dolpa‑bash‑utils loader not found: ${BASH_UTILS_LOADER}" >&2
-    exit 1
-fi
-# shellcheck source=/dev/null
-source "${BASH_UTILS_LOADER}"
 
 # --------------------------------------------------------------------
 #  Load the benchmark‑specific test definitions
@@ -131,8 +122,37 @@ source "${BASH_UTILS_LOADER}"
 #   groups.config.sh  – associative array  TEST_GROUPS[<group>]="<test1> <test2> ..."
 # --------------------------------------------------------------------
 # (Both files are expected to live in the same directory as this script)
-source "${SCRIPT_DIR}/tests.config.sh"
-source "${SCRIPT_DIR}/groups.config.sh"
+source "${SCRIPT_DIR}/config/tests.config.sh"
+source "${SCRIPT_DIR}/config/groups.config.sh"
+
+
+list_groups() {
+    local g
+
+    for g in "${!GROUPS[@]}"; do
+        printf "  %-20s\n" "$g"
+    done | sort
+}
+
+list_tests() {
+    echo "  -----------------------------------------------------------------------------"
+    printf "  %-30s %-8s %-10s %-8s %-5s %-5s\n" \
+        "TEST" "MODE" "RESOLUTION" "QUALITY" "RT" "FG"
+    echo "  -----------------------------------------------------------------------------"
+    echo ${TESTS[@]}
+
+    for t in "${!TESTS[@]}"; do
+        echo $t
+        read -r mode res quality rt fg <<< "${TESTS[$t]}"
+        echo $mode $res $quality $rt $fg
+        printf "  %-30s %-8s %-10s %-8s %-5s %-5s\n" \
+            "$t" "$mode" "$res" "$quality" "$rt" "$fg"
+    done | sort
+}
+
+print_test() {
+    echo "YYY"
+}
 
 # --------------------------------------------------------------------
 #  Helper functions (you can extend them later)
@@ -151,22 +171,26 @@ Options:
   --gamemode               Run the game under gamemode
   --group <name>           Run every test from the named group
   --timeout-minutes <N>    Set per‑test timeout (default: ${BENCHMARK_TIMEOUT_MINUTES} min)
-  --all                    Run **all** tests defined in tests.config.sh
+  --all                    Run **all** tests defined in config/tests.config.sh
+
+Available tests:
+$(list_tests)
+
+Available groups:
+$(list_groups)
+
+Print test:
+$(print_test)
+
+
+SYSTEM CONFIG FILES (loaded in order):
+    1) ${SYSTEM_CONFIG_LOCAL_FILE} (optional, selected by SYSTEM_NAME=${SYSTEM_NAME})
+    2) BENCHMARK_CONFIG=/path/to/file.conf.sh (optional override)
+
+System selection override:
+    SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
+
 EOF
-}
-
-list_tests() {
-    echo "Available tests:"
-    for t in "${!TESTS[@]}"; do
-        echo "  $t"
-    done
-}
-
-list_groups() {
-    echo "Available groups:"
-    for g in "${!TEST_GROUPS[@]}"; do
-        echo "  $g"
-    done
 }
 
 validate_profiles() {
