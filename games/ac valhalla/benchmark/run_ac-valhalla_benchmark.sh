@@ -134,6 +134,16 @@ if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
     BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
 fi
 
+# Check if the game‑specific benchmark config has defined the required variables; if not, log an error and exit (you can adapt this check to your specific game and required variables)
+if [[ $NEED_TO_TAKE_SCREENSHOT_OF_RESULTS -eq true ]]; then
+    if command -v gnome‑screenshot >/dev/null 2>&1; then
+        log_error "gnome‑screenshot is required to take screenshots of benchmark results. Please install it: sudo apt update && sudo apt install -y gnome-screenshot"
+        exit 1
+    else
+        log_info "Screenshots of benchmark results will be taken using gnome‑screenshot."
+    fi
+fi
+
 # --------------------------------------------------------------------
 #  Load the benchmark‑specific test definitions
 # --------------------------------------------------------------------
@@ -173,6 +183,11 @@ list_tests() {
     for t in "${!TESTS[@]}"; do
         echo "  $t"
     done | sort
+}
+
+# TODO: implement this function to list available graphic settings (e.g. quality presets, ray tracing modes, upscaling options, …) for use in the test definitions and documentation; you can adapt it to your specific game and settings structure
+list_graphic_settings() {
+    log_info "TODO: implement this function of Available graphic settings (for use in test definitions)"
 }
 
 # List available tests in a formatted table
@@ -249,6 +264,112 @@ System selection override:
     SYSTEM_NAME=MY_MACHINE $0 --group quick-4k"
 
 EOF
+}
+
+# Helper function to check if xdotool is installed (used for automating menu navigation to start the benchmark); you can extend this function to check for other required tools as well
+go_to_menu_and_run_bench() {
+	local win_id=""
+	local attempts=$((AUTO_CLICK_TIMEOUT_SEC * 2))
+	for _ in $(seq 1 "$attempts"); do
+		win_id="$(xdotool search --name "ASSASSIN'S CREED VALHALLA Benchmark" 2>/dev/null | head -n1 || true)"
+		if [[ -n "$win_id" ]]; then
+			local width height
+			width="$(xdotool getwindowgeometry --shell "$win_id" 2>/dev/null | awk -F= '/^WIDTH=/{print $2}')"
+			height="$(xdotool getwindowgeometry --shell "$win_id" 2>/dev/null | awk -F= '/^HEIGHT=/{print $2}')"
+
+			if [[ -z "$width" || -z "$height" ]]; then
+				width=1600
+				height=900
+			fi
+
+			local run_all_x_default=$((width - 120))
+			local run_all_y_default=$((height - 34))
+			local run_all_x="${RUN_ALL_BUTTON_X:-$run_all_x_default}"
+			local run_all_y="${RUN_ALL_BUTTON_Y:-$run_all_y_default}"
+			local run_all_screen_x="${RUN_ALL_BUTTON_SCREEN_X:-}"
+			local run_all_screen_y="${RUN_ALL_BUTTON_SCREEN_Y:-}"
+			local confirm_yes_x="${CONFIRM_YES_SCREEN_X:-}"
+			local confirm_yes_y="${CONFIRM_YES_SCREEN_Y:-}"
+			local preset_x_default=$((width / 5))
+			local preset_y_default=$((height / 2))
+			local preset_x="${PRESET_ITEM_X:-$preset_x_default}"
+			local preset_y="${PRESET_ITEM_Y:-$preset_y_default}"
+			local preset_screen_x="${PRESET_ITEM_SCREEN_X:-}"
+			local preset_screen_y="${PRESET_ITEM_SCREEN_Y:-}"
+
+			if (( run_all_x < 1 )); then run_all_x=1; fi
+			if (( run_all_y < 1 )); then run_all_y=1; fi
+			if (( preset_x < 1 )); then preset_x=1; fi
+			if (( preset_y < 1 )); then preset_y=1; fi
+
+			xdotool windowactivate "$win_id" >/dev/null 2>&1 || true
+			xdotool windowraise "$win_id" >/dev/null 2>&1 || true
+			sleep 0.6
+
+			# if [[ -n "$preset_screen_x" && -n "$preset_screen_y" ]]; then
+			# 	for _ in $(seq 1 "$PRESET_CLICK_RETRIES"); do
+			# 		xdotool mousemove --sync "$preset_screen_x" "$preset_screen_y" >/dev/null 2>&1 || true
+			# 		xdotool click 1 >/dev/null 2>&1 || true
+			# 		sleep 0.25
+			# 	done
+			# else
+			# 	for _ in $(seq 1 "$PRESET_CLICK_RETRIES"); do
+			# 		xdotool mousemove --window "$win_id" --sync "$preset_x" "$preset_y" >/dev/null 2>&1 || true
+			# 		xdotool click --window "$win_id" 1 >/dev/null 2>&1 || true
+			# 		sleep 0.25
+			# 	done
+			# fi
+
+			sleep 0.35
+			if [[ -n "$run_all_screen_x" && -n "$run_all_screen_y" ]]; then
+				for _ in $(seq 1 "$RUN_ALL_CLICK_RETRIES"); do
+					xdotool mousemove --sync "$run_all_screen_x" "$run_all_screen_y" >/dev/null 2>&1 || true
+					xdotool click 1 >/dev/null 2>&1 || true
+					sleep 0.25
+				done
+			else
+				for _ in $(seq 1 "$RUN_ALL_CLICK_RETRIES"); do
+					xdotool mousemove --window "$win_id" --sync "$run_all_x" "$run_all_y" >/dev/null 2>&1 || true
+					xdotool click --window "$win_id" 1 >/dev/null 2>&1 || true
+					sleep 0.25
+				done
+			fi
+
+			sleep 0.35
+			if [[ -n "$confirm_yes_x" && -n "$confirm_yes_y" ]]; then
+				for _ in $(seq 1 "$CONFIRM_YES_CLICK_RETRIES"); do
+					xdotool mousemove --sync "$confirm_yes_x" "$confirm_yes_y" >/dev/null 2>&1 || true
+					xdotool click 1 >/dev/null 2>&1 || true
+					sleep 0.3
+				done
+			fi
+			return 0
+		fi
+		sleep 0.5
+	done
+	return 1
+}
+
+# Helper function to take a screenshot and save them in results folder for later analysis
+# Arguments:
+#   $1 – for how long to keep taking screenshots (in seconds, default: 300 seconds = 5 minutes)
+#   $2 – how often to take screenshots (in seconds, default: 20 seconds)
+#   $3 – number of screenshots to take (default: 1)
+take_screenshots_every_after_delay() {
+    local delay_seconds
+    local each_seconds
+    local counter
+
+    delay_seconds="${1:-300}"
+    each_seconds="${2:-20}"
+    counter="${3:-1}"
+
+    sleep "$delay_seconds"
+    for i in $(seq 1 "$counter"); do
+        gnome-screenshot -f ${results_folder}/screenshot_${SHORT_GAME_NAME}_${script_run_timestamp}_${i}.png >/dev/null 2>&1 || true
+        sleep "$each_seconds"
+    done
+    return 0
 }
 
 validate_profiles() {
@@ -480,6 +601,10 @@ run_bench() {
     local full_launch_cmd_pretty=""
     printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
     log_to_file info "$log" "Full launch command: cd $(printf '%q' "$game_path") && ${full_launch_cmd_pretty% }"
+
+    # Go to menu and run the benchmark (you will need to adapt this to your specific game, e.g. by sending keystrokes or mouse clicks to navigate the menu and start the benchmark; the example below is just a placeholder and may not work for your game)
+    [[ ${NEED_TO_CLOCK_BENCHMARK_IN_MENU} ]] && go_to_menu_and_run_bench &
+    [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]] && take_screenshots_every_after_delay 15  &
 
     local exit_code
     (
