@@ -64,6 +64,7 @@ SCRIPT_RUN_TIMESTAMP=""
 # Predefined test groups and tests for common scenarios
 declare -A TEST_GROUPS
 declare -A TESTS
+declare -a BENCHMARK_HELPER_PIDS
 
 # --------------------------------------------------------------------
 #  Load the shared bash‑utils library (provides logging helpers, Bash utilities, …)
@@ -120,29 +121,13 @@ fi
 PROTON_VERSION="${GAME_PROTON_VERSION:-${PROTON_VERSION:-${PROTON_VERSION_DEFAULT}}}"
 
 # Compute timeout in seconds if not explicitly set
-if [[ -z "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
-    BENCHMARK_TIMEOUT_SECONDS=$(( BENCHMARK_TIMEOUT_MINUTES * 60 ))
-fi
+env_default BENCHMARK_TIMEOUT_SECONDS "$(( BENCHMARK_TIMEOUT_MINUTES * 60 ))"
 
 # Default user‑settings folder (Steam‑Play “compatdata” path)
-if [[ -z "${USER_SETTINGS_FOLDER:-}" ]]; then
-    USER_SETTINGS_FOLDER="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/${GAME_CREATOR_STUDIO}${GAME_NAME}/"
-fi
+env_default USER_SETTINGS_FOLDER "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/${GAME_CREATOR_STUDIO}${GAME_NAME}/"
 
 # Default benchmark results source directory (where the game writes its CSVs)
-if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
-    BENCHMARK_RESULTS_SOURCE_DIR="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
-fi
-
-# Check if the game‑specific benchmark config has defined the required variables; if not, log an error and exit (you can adapt this check to your specific game and required variables)
-if [[ $NEED_TO_TAKE_SCREENSHOT_OF_RESULTS -eq true ]]; then
-    if command -v gnome‑screenshot >/dev/null 2>&1; then
-        log_error "gnome‑screenshot is required to take screenshots of benchmark results. Please install it: sudo apt update && sudo apt install -y gnome-screenshot"
-        exit 1
-    else
-        log_info "Screenshots of benchmark results will be taken using gnome‑screenshot."
-    fi
-fi
+env_default BENCHMARK_RESULTS_SOURCE_DIR "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
 
 # --------------------------------------------------------------------
 #  Load the benchmark‑specific test definitions
@@ -154,16 +139,14 @@ fi
 
 # Load the tests config file (defines the TESTS array)
 TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.conf.sh"
-if [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
-    log_error "Tests config file not found: $TESTS_CONFIG_FILE"
+if ! validate_file "$TESTS_CONFIG_FILE" "Tests config file"; then
     exit 1
 fi
 source "$TESTS_CONFIG_FILE"
 
 # Load the groups config file (defines the TEST_GROUPS array)
 GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.conf.sh"
-if [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
-    log_error "Groups config file not found: $GROUPS_CONFIG_FILE"
+if ! validate_file "$GROUPS_CONFIG_FILE" "Groups config file"; then
     exit 1
 fi
 source "$GROUPS_CONFIG_FILE"
@@ -220,6 +203,53 @@ list_resolutions() {
     for r in "${!GAME_RESOLUTIONS[@]}"; do
         echo "  $r: ${GAME_RESOLUTIONS[$r]}"
     done | sort
+}
+
+benchmark_timestamp() {
+    time_format_epoch "$(time_epoch)" "%Y%m%d_%H%M%S" local
+}
+
+validate_runtime_dependencies() {
+    # Check if the required tools for the benchmark are installed (e.g. gnome-screenshot for taking screenshots, xdotool for automating menu navigation, …); you can extend this function to check for other dependencies as needed
+    if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS:-false} == true ]]; then
+        if ! command_exists gnome-screenshot; then
+            log_error "gnome-screenshot is required to take screenshots of benchmark results. Please install it: sudo apt update && sudo apt install -y gnome-screenshot"
+            return 1
+        fi
+
+        log_info "Screenshots of benchmark results will be taken using gnome-screenshot."
+    fi
+
+    # If we need to automate menu navigation to start the benchmark, check if xdotool is installed; you can adapt this to your specific game and how you plan to automate the menu navigation (e.g. by sending keystrokes, mouse clicks, …)
+    if [[ ${NEED_TO_CLOCK_BENCHMARK_IN_MENU:-false} == true ]]; then
+        if ! command_exists xdotool; then
+            log_error "xdotool is not installed; automatic benchmark menu navigation is unavailable."
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+register_background_helper() {
+    local helper_pid
+    helper_pid="$1"
+
+    if [[ -n "$helper_pid" ]]; then
+        BENCHMARK_HELPER_PIDS+=("$helper_pid")
+    fi
+}
+
+cleanup_background_helpers() {
+    local helper_pid
+
+    for helper_pid in "${BENCHMARK_HELPER_PIDS[@]}"; do
+        if exec_is_running "$helper_pid"; then
+            exec_kill "$helper_pid" >/dev/null 2>&1 || true
+        fi
+    done
+
+    BENCHMARK_HELPER_PIDS=()
 }
 
 # --------------------------------------------------------------------
@@ -374,20 +404,22 @@ take_screenshots_every_after_delay() {
 
 validate_profiles() {
     local missing_count
+    local profiles_dir
+
+    profiles_dir="${SCRIPT_DIR}/profiles"
     missing_count=0
 
-    if [[ ! -d "${SCRIPT_DIR}/profiles" ]]; then
-        log_error "Profiles directory not found: ${SCRIPT_DIR}/profiles"
+    if ! validate_directory "$profiles_dir" "Profiles directory"; then
         return 1
     fi
     
-    log_info "Validating profile files in ${SCRIPT_DIR}/profiles ..."
+    log_info "Validating profile files in ${profiles_dir} ..."
     for test_name in "${!TESTS[@]}"; do
         # the command stored in TESTS[<name>] is expected to be a CSV‑profile path;
         # you may adapt the check to your own format.
         local profile_file
-        profile_file="${SCRIPT_DIR}/profiles/UserSettings.${test_name}.json"
-        if [[ ! -f "$profile_file" ]]; then
+        profile_file="${profiles_dir}/UserSettings.${test_name}.json"
+        if ! is_path_file "$profile_file"; then
             log_error "Missing benchmark profile for test: ${test_name}"
             ((missing_count++))
         fi
@@ -491,6 +523,11 @@ run_bench() {
     local frame_generation
     local logfile
     local test_name
+    local proton_path
+    local game_path
+    local -a proton_candidates
+    local -a game_candidates
+    local candidate_path
 
     rs=$1
     rs_type=$2
@@ -504,37 +541,47 @@ run_bench() {
     test_name=${10:-""}
 
     # Find Proton installation - check Steam root and custom library possible locations
-    local proton_path
-    proton_path="$STEAM_PATH/compatibilitytools.d/$PROTON_VERSION"
-    if [[ ! -d "$proton_path" ]]; then
-        proton_path="$STEAM_ROOT/compatibilitytools.d/$PROTON_VERSION"
-        if [[ ! -d "$proton_path" ]]; then
-            log_to_file error "$logfile" "Proton $PROTON_VERSION not found"
-            return 1
+    proton_candidates=(
+        "$STEAM_PATH/compatibilitytools.d/$PROTON_VERSION"
+        "$STEAM_ROOT/compatibilitytools.d/$PROTON_VERSION"
+    )
+    proton_path=""
+    for candidate_path in "${proton_candidates[@]}"; do
+        if is_path_directory "$candidate_path"; then
+            proton_path="$candidate_path"
+            break
         fi
+    done
+    if [[ -z "$proton_path" ]]; then
+        log_to_file error "$logfile" "Proton $PROTON_VERSION not found"
+        return 1
     fi
 
     # Find game installation - check multiple possible locations
-    local game_path
-    game_path="$STEAM_PATH/steamapps/common/$GAME_NAME"
-    if [[ ! -d "$game_path" ]]; then
-        game_path="$STEAM_ROOT/steamapps/common/$GAME_NAME"
-        if [[ ! -d "$game_path" ]]; then
-            game_path="$CUSTOM_LIBRARY_PATH/steamapps/common/$GAME_NAME"
-            if [[ ! -d "$game_path" ]]; then
-                log_to_file error "$logfile" "$GAME_NAME not found in any of these locations:"
-                log_to_file error "$logfile" "  - $STEAM_PATH/steamapps/common/$GAME_NAME"
-                log_to_file error "$logfile" "  - $STEAM_ROOT/steamapps/common/$GAME_NAME"
-                log_to_file error "$logfile" "  - $CUSTOM_LIBRARY_PATH/steamapps/common/$GAME_NAME"
-                return 1
-            fi
+    game_candidates=(
+        "$STEAM_PATH/steamapps/common/$GAME_NAME"
+        "$STEAM_ROOT/steamapps/common/$GAME_NAME"
+        "$CUSTOM_LIBRARY_PATH/steamapps/common/$GAME_NAME"
+    )
+    game_path=""
+    for candidate_path in "${game_candidates[@]}"; do
+        if is_path_directory "$candidate_path"; then
+            game_path="$candidate_path"
+            break
         fi
+    done
+    if [[ -z "$game_path" ]]; then
+        log_to_file error "$logfile" "$GAME_NAME not found in any of these locations:"
+        log_to_file error "$logfile" "  - $STEAM_PATH/steamapps/common/$GAME_NAME"
+        log_to_file error "$logfile" "  - $STEAM_ROOT/steamapps/common/$GAME_NAME"
+        log_to_file error "$logfile" "  - $CUSTOM_LIBRARY_PATH/steamapps/common/$GAME_NAME"
+        return 1
     fi
 
     # Final check for the game executable
     local exe_path
     exe_path="$game_path/$GANME_EXE_PATH$GAME_EXE"
-    if [[ ! -f "$exe_path" ]]; then
+    if ! is_path_file "$exe_path"; then
         log_to_file error "$log" "Game executable not found at $exe_path"
         return 1
     fi
@@ -557,7 +604,7 @@ run_bench() {
 
     # Enable gamemoderun and mangohud if requested (and available); they will be injected into the Proton launch command
     if [[ "$ENABLE_GAMEMODERUN" -eq 1 ]]; then
-        if command -v gamemoderun >/dev/null 2>&1; then
+        if app_is_installed gamemoderun; then
             proton_run_cmd=(gamemoderun "${proton_run_cmd[@]}")
         else
             log_to_file error "$log" "--gamemode requested but 'gamemoderun' was not found in PATH."
@@ -566,7 +613,7 @@ run_bench() {
     fi
     # Enable MangoHud if requested; it will be injected into the Proton launch command via the MANGOHUD=1 environment variable
     if [[ "$ENABLE_MANGOHUD" -eq 1 ]]; then
-        if command -v mangohud >/dev/null 2>&1; then
+        if app_is_installed mangohud; then
             proton_run_cmd=("MANGOHUD=1" "${proton_run_cmd[@]}")
         else
             log_to_file error "$log" "--mangohud requested but 'mangohud' was not found in PATH."
@@ -575,7 +622,7 @@ run_bench() {
     fi
 
     # Check if the 'timeout' command is available (part of coreutils); we rely on it to enforce time limits on the benchmark runs
-    if ! command -v timeout >/dev/null 2>&1; then
+    if ! command_exists timeout; then
         log_to_file error "$log" "Required command 'timeout' not found. Please install coreutils."
         return 1
     fi
@@ -603,8 +650,14 @@ run_bench() {
     log_to_file info "$log" "Full launch command: cd $(printf '%q' "$game_path") && ${full_launch_cmd_pretty% }"
 
     # Go to menu and run the benchmark (you will need to adapt this to your specific game, e.g. by sending keystrokes or mouse clicks to navigate the menu and start the benchmark; the example below is just a placeholder and may not work for your game)
-    [[ ${NEED_TO_CLOCK_BENCHMARK_IN_MENU} ]] && go_to_menu_and_run_bench &
-    [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]] && take_screenshots_every_after_delay 15  &
+    if [[ ${NEED_TO_CLOCK_BENCHMARK_IN_MENU} ]]; then
+        go_to_menu_and_run_bench &
+        register_background_helper "$!"
+    fi
+    if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
+        take_screenshots_every_after_delay 15 &
+        register_background_helper "$!"
+    fi
 
     local exit_code
     (
@@ -659,17 +712,17 @@ copy_benchmark_result_file() {
     source_dir="$BENCHMARK_RESULTS_SOURCE_DIR"
     output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
 
-    mkdir -p "$output_dir"
+    ensure_directory "$output_dir"
 
     # Use the provided SCRIPT_RUN_TIMESTAMP environment variable if set; otherwise, generate a new timestamp for this run. This allows for consistent timestamps across multiple tests in the same run, while still having unique timestamps for separate runs.
     if [[ -z "$script_run_timestamp" ]]; then
-        script_run_timestamp="$(date +%Y%m%d_%H%M%S)"
+        script_run_timestamp="$(benchmark_timestamp)"
     else
         script_run_timestamp="$SCRIPT_RUN_TIMESTAMP"
     fi
 
     # Check results source directory
-    if [[ ! -d "$source_dir" ]]; then
+    if ! validate_directory "$source_dir"; then
         log_to_file warning "$logfile" "Benchmark source directory not found: $source_dir"
         return 0
     fi
@@ -677,23 +730,22 @@ copy_benchmark_result_file() {
     local latest_benchmark_dir
     latest_benchmark_dir="$(find "$source_dir" -mindepth 1 -maxdepth 1 -type d -name "benchmark_*" -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-)"
 
-    if [[ -z "$latest_benchmark_dir" || ! -d "$latest_benchmark_dir" ]]; then
+    if [[ -z "$latest_benchmark_dir" ]] || ! is_path_directory "$latest_benchmark_dir"; then
         log_to_file warning "$logfile" "No benchmark_* directory found in $source_dir"
         return 0
     fi
 
     local source_file="$latest_benchmark_dir/summary.json"
-    if [[ ! -f "$source_file" ]]; then
+    if ! is_path_file "$source_file"; then
         log_to_file warning "$logfile" "summary.json not found in latest benchmark directory: $latest_benchmark_dir"
         return 0
     fi
 
     local destination_file="$output_dir/${GAME_ID}_result_${test_name}_${GPU_METADATA_TAG}_${SCRIPT_RUN_TIMESTAMP}.json"
-    cp "$source_file" "$destination_file"
-    if [[ $? -eq 0 ]]; then
-        log_to_file success "$log" "Copied benchmark result: $destination_file"
+    if copy_file "$source_file" "$destination_file"; then
+        log_to_file success "$logfile" "Copied benchmark result: $destination_file"
     else
-        log_to_file warning "$log" "Failed to copy benchmark result from $source_file"
+        log_to_file warning "$logfile" "Failed to copy benchmark result from $source_file"
     fi
 }
 
@@ -702,8 +754,8 @@ copy_benchmark_result_file() {
 sanitize_filename_segment() {
     local value
     value="$1"
-    value="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
-    value="$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    value="$(str_lower "$value")"
+    value="$(str_trim "$value")"
     value="$(echo "$value" | sed 's/[[:space:]]\+/_/g')"
     value="$(echo "$value" | sed 's/[^a-z0-9._-]/-/g')"
     value="$(echo "$value" | sed 's/[-_][-_]*/-/g')"
@@ -724,22 +776,22 @@ detect_gpu_metadata() {
     gpu_driver="unknown-driver"
 
     # NVIDIA GPUs: use nvidia-smi to get the GPU name, total VRAM, and driver version
-    if command -v nvidia-smi >/dev/null 2>&1; then
+    if command_exists nvidia-smi; then
         local gpu_line
         gpu_line="$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits 2>/dev/null | head -n1)"
         if [[ -n "$gpu_line" ]]; then
             local model_raw vram_raw driver_raw
             IFS=',' read -r model_raw vram_raw driver_raw <<< "$gpu_line"
-            model_raw="$(echo "$model_raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-            vram_raw="$(echo "$vram_raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-            driver_raw="$(echo "$driver_raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            model_raw="$(str_trim "$model_raw")"
+            vram_raw="$(str_trim "$vram_raw")"
+            driver_raw="$(str_trim "$driver_raw")"
 
             [[ -n "$model_raw" ]] && gpu_model="$model_raw"
             [[ -n "$vram_raw" ]] && gpu_vram="${vram_raw}mb"
             [[ -n "$driver_raw" ]] && gpu_driver="$driver_raw"
         fi
     # Other GPUs: use lspci to get the GPU model (VRAM and driver info may not be available)
-    elif command -v lspci >/dev/null 2>&1; then
+    elif command_exists lspci; then
         local lspci_line
         lspci_line="$(lspci 2>/dev/null | grep -Ei 'vga|3d|display' | head -n1)"
         if [[ -n "$lspci_line" ]]; then
@@ -759,7 +811,7 @@ main() {
     #  Runtime state variables
     # ----------------------------------------------------------------
     local script_run_timestamp
-    script_run_timestamp="$(date +%Y%m%d_%H%M%S)"
+    script_run_timestamp="$(benchmark_timestamp)"
     SCRIPT_RUN_TIMESTAMP="$script_run_timestamp"
     local logfile
     logfile="${SCRIPT_DIR}/${GAME_SHORT_NAME}_benchmark_${script_run_timestamp}.log"
@@ -768,12 +820,14 @@ main() {
     #  Command‑line parsing (exactly the options you asked for)
     # ----------------------------------------------------------------
     
-    local gamemode_requested
+    local -a normalized_args
     local -a selected_tests
-
-    local run_all
+    local -a tests_to_run
+    local -a selected_groups
+    local group_name
     local timeout_override
-    local tests_to_run
+    local proton_version_override
+    local run_all
     local total_tests_count
     local cli_gamemode_override
     local cli_mangohud_override
@@ -786,143 +840,153 @@ main() {
     local current_test_index
 
     run_all=false
+    normalized_args=()
     selected_tests=()
+    tests_to_run=()
+    selected_groups=()
     total_tests_count=0
     cli_gamemode_override=false
     cli_mangohud_override=false
+    cli_proton_override=false
+    cli_native_override=false
 
     detect_gpu_metadata  # populate GPU_METADATA_TAG with the detected GPU info (sanitized for use in filenames and tags)
 
-    while (( $# )); do
-        case "$1" in
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            --list)
-                list_tests
-                exit 0
-                ;;
-            --groups)
-                list_groups
-                exit 0
-                ;;
-            --validate-profiles)
-                if validate_profiles; then
-                    exit 0
-                else
-                    exit 1
-                fi
-                ;;
-            --gamemode)
-                ENABLE_GAMEMODERUN=1
-                cli_gamemode_override=true
-                shift
-                ;;
-            --mangohud)
-                ENABLE_MANGOHUD=1
-                cli_mangohud_override=true
-                shift
-                ;;
-            --proton)
-                ENABLE_PROTON=1
-                cli_proton_override=true
-                shift
-                ;;
-            --proton-version)
-                if [[ -z "$2" ]]; then
-                    log_error "--proton-version requires a version string (e.g. GE-Proton10-32)"
-                    exit 1
-                fi
-                PROTON_VERSION="$2"
-                # allow explicitly setting PROTON_VERSION via --proton-version, which also implies --proton mode; if --proton was not already set, enable it now
-                ENABLE_PROTON=1
-                cli_proton_override=true
-                shift 2
-                ;;
-            --native)
-                ENABLE_PROTON=1
-                cli_proton_override=true
-                ENABLE_PROTON=0
-                cli_proton_override=true
-                shift
-                ;;
-            --group)
-                if [[ -z "$2" ]]; then
-                    log_error "--group requires a group name"
-                    exit 1
-                fi
-                if [[ ! "${TEST_GROUPS[$2]+isset}" ]]; then
-                    log_error "Unknown test group '$2'. Use --groups to see available groups."
-                    exit 1
-                fi
-                # Add all tests from the group
-                read -ra group_tests <<< "${TEST_GROUPS[$2]}"
-                tests_to_run+=("${group_tests[@]}")
-                shift 2
-                ;;
-            --timeout-minutes)
-                if [[ -z "${2:-}" || ! "$2" =~ ^[0-9]+$ || "$2" -le 0 ]]; then
-                    log_error "--timeout-minutes requires a positive integer value"
-                    exit 1
-                fi
-                BENCHMARK_TIMEOUT_MINUTES="$2"
-                BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
-                shift 2
-                ;;
-            --all)
-                run_all=true
-                shift
-                ;;
-            -*)
-                log_error "Unknown option $1"
-                log_error "Use --help for usage information."
-                exit 1
+    for arg in "$@"; do
+        case "$arg" in
+            -h)
+                normalized_args+=("--help")
                 ;;
             *)
-                tests_to_run+=("$1")
-                shift
+                normalized_args+=("$arg")
                 ;;
         esac
     done
 
+    args_set_flags --help --list --groups --validate-profiles --gamemode --mangohud --proton --native --all
+    args_set_values --proton-version --group --timeout-minutes
+    args_parse "${normalized_args[@]}"
+
+    for arg in "${ARGS_POSITIONAL[@]}"; do
+        if [[ "$arg" == -* ]]; then
+            log_error "Unknown option $arg"
+            log_error "Use --help for usage information."
+            exit 1
+        fi
+    done
+
+    if args_get_flag --help >/dev/null 2>&1; then
+        show_help
+        exit 0
+    fi
+
+    if args_get_flag --list >/dev/null 2>&1; then
+        list_tests
+        exit 0
+    fi
+
+    if args_get_flag --groups >/dev/null 2>&1; then
+        list_groups
+        exit 0
+    fi
+
+    if args_get_flag --validate-profiles >/dev/null 2>&1; then
+        if validate_profiles; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
+
+    if args_get_flag --gamemode >/dev/null 2>&1; then
+        ENABLE_GAMEMODERUN=1
+        cli_gamemode_override=true
+    fi
+
+    if args_get_flag --mangohud >/dev/null 2>&1; then
+        ENABLE_MANGOHUD=1
+        cli_mangohud_override=true
+    fi
+
+    if args_get_flag --proton >/dev/null 2>&1; then
+        ENABLE_PROTON=1
+        cli_proton_override=true
+    fi
+
+    if args_get_flag --native >/dev/null 2>&1; then
+        ENABLE_PROTON=0
+        cli_native_override=true
+    fi
+
+    proton_version_override="$(args_get_value --proton-version)"
+    if [[ -n "$proton_version_override" ]]; then
+        if [[ "$proton_version_override" == -* ]]; then
+            log_error "--proton-version requires a version string (e.g. GE-Proton10-32)"
+            exit 1
+        fi
+        PROTON_VERSION="$proton_version_override"
+        ENABLE_PROTON=1
+        cli_proton_override=true
+    fi
+
+    timeout_override="$(args_get_value --timeout-minutes)"
+    if [[ -n "$timeout_override" ]]; then
+        if [[ ! "$timeout_override" =~ ^[0-9]+$ || "$timeout_override" -le 0 ]]; then
+            log_error "--timeout-minutes requires a positive integer value"
+            exit 1
+        fi
+        BENCHMARK_TIMEOUT_MINUTES="$timeout_override"
+        BENCHMARK_TIMEOUT_SECONDS=$((BENCHMARK_TIMEOUT_MINUTES * 60))
+    fi
+
+    args_get_values --group selected_groups
+    for group_name in "${selected_groups[@]}"; do
+        if [[ -z "$group_name" || "$group_name" == -* ]]; then
+            log_error "--group requires a group name"
+            exit 1
+        fi
+        if [[ ! "${TEST_GROUPS[$group_name]+isset}" ]]; then
+            log_error "Unknown test group '$group_name'. Use --groups to see available groups."
+            exit 1
+        fi
+        read -ra group_tests <<< "${TEST_GROUPS[$group_name]}"
+        tests_to_run+=("${group_tests[@]}")
+    done
+
+    if args_get_flag --all >/dev/null 2>&1; then
+        run_all=true
+    fi
+
+    selected_tests=("${ARGS_POSITIONAL[@]}")
+    tests_to_run+=("${selected_tests[@]}")
+
     # Check if Steam directory exists
-    if [[ ! -d "$STEAM_PATH" ]]; then
-        log_error "Steam directory not found at $STEAM_PATH"
+    if ! validate_directory "$STEAM_PATH" "Steam directory"; then
+        exit 1
+    fi
+
+    if ! validate_runtime_dependencies; then
         exit 1
     fi
     
     # Ensure log directory exists
-    mkdir -p "${SCRIPT_DIR}/logs"
+    ensure_directory "${SCRIPT_DIR}/logs"
 
     # ----------------------------------------------------------------
     #  If “--all” was given, replace the explicit list with **all** tests
     # ----------------------------------------------------------------
-    if (( run_all )); then
-        selected_tests=( "${!TESTS[@]}" )
-    fi
-
-    # ----------------------------------------------------------------
-    #  If nothing was selected, show help and abort
-    # ----------------------------------------------------------------
-    if (( ${#selected_tests[@]} == 0 )); then
-        log_error "No tests selected.  Use --list or pass test names on the command line."
-        show_help
-        exit 1
-    fi
-
-    # ----------------------------------------------------------------
-    #  Enable gamemode if requested
-    # ----------------------------------------------------------------
-    if (( gamemode_requested )); then
-        ENABLE_GAMEMODERUN=1
+    if [[ "$run_all" == "true" ]]; then
+        tests_to_run=()
+        for test_name in "${!TESTS[@]}"; do
+            tests_to_run+=("$test_name")
+        done
     fi
 
     # ----------------------------------------------------------------
     #  Prepare the log file
     # ----------------------------------------------------------------
     log_to_file "info" "$logfile" "=================================================================="
-    log_to_file "info" "$logfile" "${GAME_NAME} Benchmark – $(date)"
+    log_to_file "info" "$logfile" "${GAME_NAME} Benchmark – $(time_now_iso8601_local)"
     log_to_file "info" "$logfile" "=================================================================="
     log_to_file "info" "$logfile" "Proton version   : ${PROTON_VERSION}"
     log_to_file "info" "$logfile" "Steam library    : ${CUSTOM_LIBRARY_PATH}"
@@ -974,6 +1038,9 @@ main() {
     failed_tests=()
     successful_tests=()
     current_test_index=0
+
+    trap_on_exit cleanup_background_helpers
+    trap_signals INT TERM
     
     # ----------------------------------------------------------------
     #  Run the selected tests one‑by‑one, logging everything through the
