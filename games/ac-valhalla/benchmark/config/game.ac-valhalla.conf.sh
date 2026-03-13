@@ -10,3 +10,7 @@ GAME_LAUNCH_ARGS="--launcher-skip --intro-skip -benchmark"
                                             # Game launcher name (used for folder paths in the user settings and benchmark results)
 
 GAME_PROFILE_EXTENSION="ini"
+
+# Benchmark configuration
+NEED_TO_CLOCK_BENCHMARK_IN_MENU=true
+NEED_TO_TAKE_SCREENSHOT_OF_RESULTS=true
