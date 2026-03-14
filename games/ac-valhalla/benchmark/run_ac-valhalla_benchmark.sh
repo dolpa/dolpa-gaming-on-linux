@@ -66,6 +66,9 @@ declare -A TEST_GROUPS
 declare -A TESTS
 declare -a BENCHMARK_HELPER_PIDS
 
+# Screenshot Variables
+_NUMBER_OF_SCREENSHOTS=1                     # Number of screenshots to take during the benchmark run (if NEED_TO_TAKE_SCREENSHOT_OF_RESULTS is true)
+
 # --------------------------------------------------------------------
 #  Load the shared bash‑utils library (provides logging helpers, Bash utilities, …)
 # --------------------------------------------------------------------
@@ -216,7 +219,10 @@ validate_runtime_dependencies() {
             log_error "gnome-screenshot is required to take screenshots of benchmark results. Please install it: sudo apt update && sudo apt install -y gnome-screenshot"
             return 1
         fi
-
+        if ! command_exists magick; then
+            log_error "ImageMagick (magick) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y imagemagick"
+            return 1
+        fi
         log_info "Screenshots of benchmark results will be taken using gnome-screenshot."
     fi
 
@@ -396,10 +402,48 @@ take_screenshots_every_after_delay() {
 
     sleep "$delay_seconds"
     for i in $(seq 1 "$counter"); do
-        gnome-screenshot -f ${results_folder}/screenshot_${SHORT_GAME_NAME}_${script_run_timestamp}_${i}.png >/dev/null 2>&1 || true
+        gnome-screenshot -f ${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png >/dev/null 2>&1 || true
         sleep "$each_seconds"
     done
+
     return 0
+}
+
+# Extract the results from the screenshots taken during the benchmark run and save them in a structured format (e.g. CSV) for later analysis; you can adapt it to how the benchmark results are displayed in the screenshots and what specific information you want to extract (e.g. average FPS, frametimes, …); if a custom function is defined in the game config file (e.g. custom_extract_benchmark_results_from_screenshots_ac_valhalla), it will be used instead of this default function; you can also customize this default function if needed
+extract_benchmark_results_from_screenshots_to_results() {
+    log_info "TODO: implement this function to extract benchmark results from screenshots (e.g. using OCR) and save them in a structured format (e.g. CSV) for later analysis; you can adapt it to your specific game and how the benchmark results are displayed in the screenshots"
+    # try each screenshot taken during the benchmark run and extract the relevant information (e.g. average FPS, frametimes, …) using OCR or other methods; you can use tools like tesseract‑ocr for OCR, or if the game provides an API or a way to export the results in a structured format, you can use that instead
+
+    # Get the posion of the benchmark results in the screenshots
+    local position_w
+    local position_h
+    local position_x_offset
+    local position_y_offset
+    position_w="${BENCHMARK_SCREENSHOT_RESULTS_W:-}"
+    position_h="${BENCHMARK_SCREENSHOT_RESULTS_H:-}"
+    position_x_offset="${BENCHMARK_SCREENSHOT_RESULTS_X_OFFSET:-}"
+    position_y_offset="${BENCHMARK_SCREENSHOT_RESULTS_Y_OFFSET:-}"
+    for i in $(seq 1 "$_NUMBER_OF_SCREENSHOTS"); do
+        # Implement OCR or other methods to extract benchmark results from each screenshot
+
+        # Crop the image
+        gm convert "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png" \
+            -crop "${position_w}x${position_h}+${position_x_offset}+${position_y_offset}" \
+            "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}_cropped.png"
+        # imagemagick_output=$(magick convert ${results_folder}/screenshot_${SHORT_GAME_NAME}_${script_run_timestamp}_${i}.png -crop 800x600+100+100 +repage ${results_folder}/screenshot_cropped_${SHORT_GAME_NAME}_${script_run_timestamp}_${i}.png 2>&1)
+        # extract the results
+
+        # pre-process the image
+        ffmpeg -i "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}_cropped.png" \
+            -vf "format=gray,negate,eq=contrast=1.5" \
+            "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}_cropped_processed.png"
+            
+        # extract text using tesseract OCR
+        tesseract "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}_cropped_processed.png" \
+            stdout --psm 11 -c tessedit_char_whitelist=0123456789., | tr -s '\n' ' ' | awk '{print $3}' > \
+            ${results_folder}/result_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.txt
+        
+    done
 }
 
 validate_profiles() {
@@ -689,11 +733,26 @@ run_bench() {
         log_to_file error "$logfile" "Benchmark failed for $mode (exit code: $exit_code)"
     fi
 
+    # 
+    if [[ $exit_code -eq 0 && ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
+        # If the benchmark completed successfully, it's time to extract the results from the screenshots; you can implement the extraction logic in the extract_benchmark_results_from_screenshots_to_results function, or if you have a custom function for this specific game, you can call it here (just make sure to define it in the game config file or the global benchmark config file)
+        if declare -F "$CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION" > /dev/null; then
+            log_to_file info "$logfile" "Extracting benchmark results from screenshots using custom function: $CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION"
+            "$CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION"
+        else
+            log_to_file info "$logfile" "Custom function for extracting benchmark results from screenshots is not defined. Using the default extraction."
+            extract_benchmark_results_from_screenshots_to_results
+        fi
+    fi
+
     # Copy the benchmark result file (e.g. CSV) to the results folder with a name that includes the test name, mode, resolution, and GPU metadata; you will need to adapt the source file name and the naming format to your specific game and benchmark output
-    if [[ -n "$test_name" ]]; then
-        copy_benchmark_result_file "$test_name" "$logfile"
-    else
-        copy_benchmark_result_file "manual-${mode}-${res}" "$logfile"
+    if [[ NEED_TO_TAKE_SCREENSHOT_OF_RESULTS -eq 0 ]]; then
+        # If we took screenshots of the benchmark results, we assume that the extracted results are saved in a structured format (e.g. CSV) in the results folder, and we copy that file; you can adapt this to your specific extraction logic and output format
+        if [[ -n "$test_name" ]]; then
+            copy_benchmark_result_file "$test_name" "$logfile"
+        else
+            copy_benchmark_result_file "manual-${mode}-${res}" "$logfile"
+        fi
     fi
     
     sleep 15   # give the game time to close cleanly
