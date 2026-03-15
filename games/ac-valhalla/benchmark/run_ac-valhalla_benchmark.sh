@@ -22,6 +22,7 @@ STEAM_PATH="${HOME}/.local/share/Steam"     # Base path to Steam (used for Proto
 STEAM_ROOT="${HOME}/.steam/root"            # Steam root path
 CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam" # Custom Steam library path (where the game is installed) – override in config if needed
 
+
 # --------------------------------------------------------------------
 #  Local system configuration (per‑machine)
 # --------------------------------------------------------------------
@@ -82,6 +83,10 @@ source "${BASH_UTILS_LOADER}"
 
 # Configure Bash Utilites
 BASH_UTILS_FORCE_COLOR=true   # force‑enable colored output (for logs, tables, …) even if not running in a terminal (e.g. when redirecting to a file); the shared library will handle this gracefully and disable colors if the output is not a TTY
+
+BASH_UTILS_LOG_LEVEL="trace"  # default log level for the shared logging library (can be overridden by the environment variable BASH_UTILS_LOG_LEVEL or the system config files)
+
+BASH_UTILS_VERBOSE="true"     # enable verbose logging for the shared library (e.g. to log debug information about argument parsing, configuration loading, …); can be overridden by the environment variable BASH_UTILS_VERBOSE or the system config files
 
 # --------------------------------------------------------------------
 #  Load system configuration files (they may overwrite the defaults)
@@ -212,15 +217,15 @@ show_test() {
     fi
     read -r dx rs rs_type rs_preset res quality rt rt_preset fg <<< "${TESTS[$test]}"
     echo "Test definition for '$test':"
-    echo "  DX (DirectX): $dx"
-    echo "  RS (Resolution Scaling): $rs"
-    echo "  RS-TYPE (Resolution Scaling Type): $rs_type"
+    echo "  DX (DirectX)                        : $(str_upper $dx)"
+    echo "  RS (Resolution Scaling)             : $rs"
+    echo "  RS-TYPE (Resolution Scaling Type)   : $rs_type"
     echo "  RS-PRESET (Resolution Scaling Preset): $rs_preset"
-    echo "  RESOLUTION: $res"
-    echo "  QUALITY: $quality"
-    echo "  RT: $rt"
-    echo "  RT-PRESET: $rt_preset"
-    echo "  FG: $fg"
+    echo "  RESOLUTION (Screen Resolution)      : $res"
+    echo "  QUALITY (Graphics Quality)          : $quality"
+    echo "  RT (Ray Tracing)                    : $rt"
+    echo "  RT-PRESET (Ray Tracing Preset)      : $rt_preset"
+    echo "  FG (Frame Generation)               : $fg"
 }
 
 list_resolutions() {
@@ -948,7 +953,10 @@ main() {
     done
 
     args_set_flags --help --list --groups --validate-profiles --gamemode --mangohud --proton --native --all
-    args_set_values --show-test --proton-version --group --timeout-minutes 
+    args_set_values --show-test --proton-version --group --timeout-minutes
+
+    log_debug "Normalized arguments: ${normalized_args[*]}"
+    
     args_parse "${normalized_args[@]}"
 
     for arg in "${ARGS_POSITIONAL[@]}"; do
@@ -1005,7 +1013,7 @@ main() {
     show_test="$(args_get_value --show-test)"
     log_info "show_test value: $show_test"
     if [[ -n "$show_test" ]]; then
-        show_test "$test_to_show"
+        show_test "$show_test"
         exit 0
     else
         log_info "No specific test specified to show with --show-test; ignoring."
