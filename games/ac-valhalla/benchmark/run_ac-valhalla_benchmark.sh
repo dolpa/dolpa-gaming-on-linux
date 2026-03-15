@@ -96,7 +96,7 @@ else
 fi
 
 # Load global benchmark configuration
-GLOBAL_BENCHMARK_CONFIG_FILE="${SCRIPT_DIR}/../etc/benchmark.config.sh"
+GLOBAL_BENCHMARK_CONFIG_FILE="${SCRIPT_DIR}/../../etc/benchmark.config.sh"
 log_info "Loading global benchmark config from ${GLOBAL_BENCHMARK_CONFIG_FILE}"
 if [[ -f "${GLOBAL_BENCHMARK_CONFIG_FILE}" ]]; then
     # shellcheck source=/dev/null
@@ -180,25 +180,47 @@ list_graphic_settings() {
 list_tests_table() {
     local t
     echo "  --------------------------------------------------------------------------------------------------------------------------------"
-    printf "  %-2s %-45s %-6s %-8s %-11s %-11s %-11s %-4s %-10s %-8s\n" \
-        "Av" "TEST" "RS" "RS-TYPE" "RS-PRESET" "RESOLUTION" "QUALITY" "RT" "RT-PRESET" "FG"
+    printf "  %-2s %-45s %-4s %-6s %-8s %-11s %-11s %-11s %-4s %-10s %-8s\n" \
+        "Av" "TEST" "DX" "RS" "RS-TYPE" "RS-PRESET" "RESOLUTION" "QUALITY" "RT" "RT-PRESET" "FG"
     echo "  --------------------------------------------------------------------------------------------------------------------------------"
 
     for t in "${!TESTS[@]}"; do
-        read -r rs rs_type rs_preset res quality rt rt_preset fg <<< "${TESTS[$t]}"
+        read -r dx rs rs_type rs_preset res quality rt rt_preset fg <<< "${TESTS[$t]}"
         local av
-        if [[ -f "$SCRIPT_DIR/config/profile.${t}.${GAME_PROFILE_EXTENSION}" ]]; then
+        # log_info "Profile file is: $SCRIPT_DIR/pro/${GAME_SHORT_NAME}.profile.${t}.${GAME_PROFILE_EXTENSION}"
+        if [[ -f "$SCRIPT_DIR/profiles/${GAME_SHORT_NAME}.profile.${t}.${GAME_PROFILE_EXTENSION}" ]]; then
             av=$(ansi_green "✓")
         else
             av=$(ansi_red "✗")
         fi
-        printf "  %-2s %-4s %-6s %-8s %-11s %-11s %-11s %-4s %-10s %-8s\n" \
-            "$av " "$(str_shorten 45 "$t")" "$rs" "$rs_type" "$rs_preset" "$res" "$quality" "$rt" "$rt_preset" "$fg"
+        printf "  %-2s %-45s %-4s %-6s %-8s %-11s %-11s %-11s %-4s %-10s %-8s\n" \
+            "$av " "$(str_shorten 45 "$t")" "$dx" "$rs" "$rs_type" "$rs_preset" "$res" "$quality" "$rt" "$rt_preset" "$fg"
     done | sort
     echo "  --------------------------------------------------------------------------------------------------------------------------------"
     echo "      $(ansi_green "✓") - profile file is available, ready to run"
     echo "      $(ansi_red "✗") - profile file is not available for this test"
     echo "    Run: $(basename "$0") --list to get full tests names"
+}
+
+show_test() {
+    log_info "Showing test definition for test name: '$1'"
+    local test
+    test="$1"
+    if [[ ! "${TESTS[$test]+isset}" ]]; then
+        log_error "Unknown test '$test'. Use --list to see available tests."
+        return 1
+    fi
+    read -r dx rs rs_type rs_preset res quality rt rt_preset fg <<< "${TESTS[$test]}"
+    echo "Test definition for '$test':"
+    echo "  DX (DirectX): $dx"
+    echo "  RS (Resolution Scaling): $rs"
+    echo "  RS-TYPE (Resolution Scaling Type): $rs_type"
+    echo "  RS-PRESET (Resolution Scaling Preset): $rs_preset"
+    echo "  RESOLUTION: $res"
+    echo "  QUALITY: $quality"
+    echo "  RT: $rt"
+    echo "  RT-PRESET: $rt_preset"
+    echo "  FG: $fg"
 }
 
 list_resolutions() {
@@ -277,6 +299,7 @@ Options:
   --gamemode               Run the game under gamemode
   --mangohud               Enable MangoHud overlay for all tests (if installed and detected by the shared library)
   --group <name>           Run every test from the named group
+  --show-test              Show the test definition for the specified test name (e.g. "native-1080p-low-rt-off")
   --timeout-minutes <N>    Set per‑test timeout (default: ${BENCHMARK_TIMEOUT_MINUTES} min)
   --all                    Run **all** tests defined in config/tests.config.sh
 
@@ -454,6 +477,7 @@ validate_profiles() {
     missing_count=0
 
     if ! validate_directory "$profiles_dir" "Profiles directory"; then
+        log_error "Profiles directory validation failed: ${profiles_dir} is not a valid directory."
         return 1
     fi
     
@@ -462,7 +486,7 @@ validate_profiles() {
         # the command stored in TESTS[<name>] is expected to be a CSV‑profile path;
         # you may adapt the check to your own format.
         local profile_file
-        profile_file="${profiles_dir}/UserSettings.${test_name}.json"
+        profile_file="$SCRIPT_DIR/config/${GAME_SHORT_NAME}.profile.${test_name}.${GAME_PROFILE_EXTENSION}"
         if ! is_path_file "$profile_file"; then
             log_error "Missing benchmark profile for test: ${test_name}"
             ((missing_count++))
@@ -892,6 +916,7 @@ main() {
     local cli_mangohud_override
     local cli_proton_override
     local cli_native_override
+    local show_test
 
     # run related parameters
     local failed_tests
@@ -923,7 +948,7 @@ main() {
     done
 
     args_set_flags --help --list --groups --validate-profiles --gamemode --mangohud --proton --native --all
-    args_set_values --proton-version --group --timeout-minutes
+    args_set_values --show-test --proton-version --group --timeout-minutes 
     args_parse "${normalized_args[@]}"
 
     for arg in "${ARGS_POSITIONAL[@]}"; do
@@ -975,6 +1000,15 @@ main() {
     if args_get_flag --native >/dev/null 2>&1; then
         ENABLE_PROTON=0
         cli_native_override=true
+    fi
+
+    show_test="$(args_get_value --show-test)"
+    log_info "show_test value: $show_test"
+    if [[ -n "$show_test" ]]; then
+        show_test "$test_to_show"
+        exit 0
+    else
+        log_info "No specific test specified to show with --show-test; ignoring."
     fi
 
     proton_version_override="$(args_get_value --proton-version)"
