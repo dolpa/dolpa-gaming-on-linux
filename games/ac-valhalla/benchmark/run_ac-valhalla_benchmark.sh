@@ -132,10 +132,11 @@ PROTON_VERSION="${GAME_PROTON_VERSION:-${PROTON_VERSION:-${PROTON_VERSION_DEFAUL
 env_default BENCHMARK_TIMEOUT_SECONDS "$(( BENCHMARK_TIMEOUT_MINUTES * 60 ))"
 
 # Default user‑settings folder (Steam‑Play “compatdata” path)
-env_default USER_SETTINGS_FOLDER "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/AppData/Local/${GAME_CREATOR_STUDIO}${GAME_NAME}/"
+echo ">>>>>>>>>>  ${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_NAME}/"
+env_default USER_SETTINGS_FOLDER "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_NAME}/"
 
 # Default benchmark results source directory (where the game writes its CSVs)
-env_default BENCHMARK_RESULTS_SOURCE_DIR "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
+# env_default BENCHMARK_RESULTS_SOURCE_DIR "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
 
 # --------------------------------------------------------------------
 #  Load the benchmark‑specific test definitions
@@ -218,14 +219,14 @@ show_test() {
     read -r dx rs rs_type rs_preset res quality rt rt_preset fg <<< "${TESTS[$test]}"
     echo "Test definition for '$test':"
     echo "  DX (DirectX)                        : $(str_upper $dx)"
-    echo "  RS (Resolution Scaling)             : $rs"
-    echo "  RS-TYPE (Resolution Scaling Type)   : $rs_type"
-    echo "  RS-PRESET (Resolution Scaling Preset): $rs_preset"
-    echo "  RESOLUTION (Screen Resolution)      : $res"
-    echo "  QUALITY (Graphics Quality)          : $quality"
-    echo "  RT (Ray Tracing)                    : $rt"
-    echo "  RT-PRESET (Ray Tracing Preset)      : $rt_preset"
-    echo "  FG (Frame Generation)               : $fg"
+    echo "  RS (Resolution Scaling)             : $(str_upper $rs)"
+    echo "  RS-TYPE (Resolution Scaling Type)   : $(str_upper $rs_type)"
+    echo "  RS-PRESET (Resolution Scaling Preset): $(str_upper $rs_preset)"
+    echo "  RESOLUTION (Screen Resolution)      : $(str_upper $res)"
+    echo "  QUALITY (Graphics Quality)          : $(str_upper $quality)"
+    echo "  RT (Ray Tracing)                    : $(str_upper $rt)"
+    echo "  RT-PRESET (Ray Tracing Preset)      : $(str_upper $rt_preset)"
+    echo "  FG (Frame Generation)               : $(str_upper $fg)"
 }
 
 list_resolutions() {
@@ -246,8 +247,17 @@ validate_runtime_dependencies() {
             log_error "gnome-screenshot is required to take screenshots of benchmark results. Please install it: sudo apt update && sudo apt install -y gnome-screenshot"
             return 1
         fi
-        if ! command_exists magick; then
-            log_error "ImageMagick (magick) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y imagemagick"
+        # ImageMagick (magick) is not strictly required for taking screenshots, but it can be useful for processing them (e.g. cropping, resizing, …) before extracting the results; you can choose to make it a hard dependency or an optional one depending on your needs and how you implement the screenshot processing; if you decide to make it optional, you can check if it's installed and log a warning if it's not available, but still allow the script to run without it (with limited functionality for screenshot processing)
+        # if ! command_exists magick; then
+        #     log_error "ImageMagick (magick) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y imagemagick"
+        #     return 1
+        # fi
+        if ! command_exists ffmpeg; then
+            log_error "FFmpeg (ffmpeg) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y ffmpeg"
+            return 1
+        fi
+        if ! command_exists tesseract; then
+            log_error "Tesseract OCR (tesseract) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y tesseract-ocr"
             return 1
         fi
         log_info "Screenshots of benchmark results will be taken using gnome-screenshot."
@@ -447,14 +457,23 @@ extract_benchmark_results_from_screenshots_to_results() {
     local position_h
     local position_x_offset
     local position_y_offset
-    position_w="${BENCHMARK_SCREENSHOT_RESULTS_W:-}"
-    position_h="${BENCHMARK_SCREENSHOT_RESULTS_H:-}"
-    position_x_offset="${BENCHMARK_SCREENSHOT_RESULTS_X_OFFSET:-}"
-    position_y_offset="${BENCHMARK_SCREENSHOT_RESULTS_Y_OFFSET:-}"
+    local results_folder
+
+    results_folder="${BENCHMARK_RESULTS_OUTPUT_DIR}"
+    position_w="${BENCHMARK_SCREENSHOT_RESULTS_W:-50}"
+    position_h="${BENCHMARK_SCREENSHOT_RESULTS_H:-50}"
+    position_x_offset="${BENCHMARK_SCREENSHOT_RESULTS_X_OFFSET:-0}"
+    position_y_offset="${BENCHMARK_SCREENSHOT_RESULTS_Y_OFFSET:-0}"
+
+    log_debug "Results Folder is ${results_folder}"
+    log_debug "Position of benchmark results in screenshots: width=${position_w}, height=${position_h}, x_offset=${position_x_offset}, y_offset=${position_y_offset}"
     for i in $(seq 1 "$_NUMBER_OF_SCREENSHOTS"); do
         # Implement OCR or other methods to extract benchmark results from each screenshot
 
         # Crop the image
+        log_info "CMD: gm convert "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png" \
+            -crop "${position_w}x${position_h}+${position_x_offset}+${position_y_offset}" \
+            "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}_cropped.png""
         gm convert "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png" \
             -crop "${position_w}x${position_h}+${position_x_offset}+${position_y_offset}" \
             "${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}_cropped.png"
@@ -507,6 +526,183 @@ validate_profiles() {
     return 1
 }
 
+# 
+# Function to apply settings based on mode and quality preset
+# Arguments:
+#   $1 - DirextX
+#   $2 - Resolution Scaling
+#   $3 - Resolution Scaling Type
+#   $4 - Resolution Scaling Preset
+#   $5 - resolution, e.g., 1080p, 1440p
+#   $6 - quality preset, e.g., low, medium, high, ultra, custom
+#   $7 - ray tracing, e.g., off, on, psycho
+#   $8 - ray tracing preset, e.g., low, medium, high, ultra
+#   $9 - frame generation, e.g., off, on, auto
+#   $10 - log file, for logging errors and info
+#   $11 - optional test name for profile matching (preferred method), if not provided will fallback to parameter-based naming
+# "$dx" "$rs" "$rs_type" "$rs_preset" "$resolution" "$quality" "$rt" "$rt_preset" "$fg" "$logfile" "$test_name"
+
+apply_setting() {
+    local dx=${1,,}
+    local rs=${2,,}
+    local rs_type=${3,,}
+    local rs_preset=${4,,}
+    local resolution=${5,,}
+    local quality_preset=${6,,}
+    local rt=${7,,}
+    local rt_preset=${8,,}
+    local fg=${9,,}
+    local logfile=${10}
+    local test_name=${11,,}
+
+    local original_mode="$mode"
+    local settings_dir="${USER_SETTINGS_FOLDER}"
+    local profile_dir="${SCRIPT_DIR}/profiles"
+    local target_settings_file="${settings_dir}/${USER_CONFIG_FILENAME}.${GAME_PROFILE_EXTENSION}"
+
+    log_debug "settings_dir=${settings_dir}"
+
+    log_debug "Applying settings for test '$test_name' with parameters: DirectX='$dx', Resolution Scaling='$rs', Resolution Scaling Type='$rs_type', Resolution Scaling Preset='$rs_preset', Resolution='$resolution', Quality='$quality_preset', Ray Tracing='$rt', Ray Tracing Preset='$rt_preset', Frame Generation='$fg'"
+
+    # 1. DirectX version is determined by the test definition (e.g. "dx11" or "dx12")
+    if [[ ! "$dx" =~ ^dx[0-9]+$ ]]; then
+        log_error error "$log" "Invalid DirectX version '$dx'. Expected format: dx<version> (e.g., dx11, dx12)."
+        return 1
+    fi
+
+    # 2. Check if Resolution Scaling defined in the test is supported (e.g. "off", "on", "auto", "x2", "x4", "rs-dlss", "rs-fsr2‑quality", …); you can adapt this check to your specific game and how you define the resolution scaling options in your test definitions
+    case "$rs" in
+        "off"|"dlss"|"fsr21"|"frs3"|"xess")
+            ;;
+        *)
+            log_error error "$log" "Unsupported resolution scaling option '$rs'. Supported: off, dlss, fsr21, frs3, xess"
+            return 1
+            ;;
+    esac
+
+    # 3. Check if Resolution Scaling Type is defined in the test and supported (e.g. "na", "nss", "tm")
+    case "$rs_type" in
+        "na"|"nss"|"tm")
+            ;;
+        *)
+            log_error error "$log" "Unsupported resolution scaling option '$rs_type'. Supported: na, nss, tm"
+            return 1
+            ;;
+    esac
+
+    # 4. Check if Resolution Scaling Preset
+    case "$rs_preset" in
+        "na"|"auto"|"nvidia dlaa"|"quality"|"performance"|"ultra performance")
+            ;;
+        *)
+            log_error error "$log" "Unsupported resolution scaling preset '$rs_preset'. Supported: quality, performance, balanced, ... "
+            return 1
+            ;;
+    esac
+
+    # 5. Validate resolution format (e.g., 1440p)
+    if [[ ! "$resolution" =~ ^[0-9]+p$ ]]; then
+        log_error error "$log" "Invalid resolution '$resolution'. Expected format: <height>p (e.g., 1080p, 1440p)."
+        return 1
+    fi
+
+    # 6. Validate quality preset
+    case "$quality_preset" in
+        "low"|"medium"|"high"|"very high"|"ultra"|"custom")
+            ;;
+        *)
+            log_to_file error "$log" "Unsupported quality preset '$quality_preset'. Supported: low, medium, high, very high, ultra, custom"
+            return 1
+            ;;
+    esac
+
+    # 7. Validate ray tracing options
+    case "$rt" in
+        "off"|"on")
+            ;;
+        *)
+            log_to_file error "$log" "Unsupported ray tracing '$rt'. Supported: off, on, psycho"
+            return 1
+            ;;
+    esac
+
+    # 8. Validate ray tracing preset options
+    case "$rt_preset" in
+        "na"|"low"|"medium"|"high"|"ultra")
+            ;;
+        *)
+            log_to_file error "$log" "Unsupported ray tracing preset '$rt_preset'. Supported: off, low, medium, high, ultra"
+            return 1
+            ;;
+    esac 
+
+    # 9. Validate frame generation options
+    case "$fg" in
+        "off"|"dlssx2"|"dlssx3"|"dlssx4"|"fsr31")
+            ;;
+        *)
+            log_to_file error "$log" "Unsupported frame generation '$fg'. Supported: off, dlssx2, dlssx3, dlssx4, fsr31"
+            return 1
+            ;;
+    esac
+
+    # Check if user settings directory exists
+    if ! is_path_directory "$settings_dir"; then
+        log_error "$log" "User settings directory does not exist: $settings_dir"
+        log_warning "$log" "Please ensure the game has been run at least once to create the settings directory."
+        return 1
+    fi
+
+    # Look for exact profile match based on test name or parameters
+    local exact_profile=""
+    
+    if [[ -n "$test_name" ]]; then
+        # Use test name for profile matching (preferred method)
+        exact_profile="${profile_dir}/${GAME_SHORT_NAME}.profile.${test_name}.${GAME_PROFILE_EXTENSION}"
+    else
+        # Fallback to parameter-based naming for backward compatibility
+        # TODO: need to add the profile generation from params
+        exact_profile="${profile_dir}/${GAME_SHORT_NAME}.profile.${original_mode}.${quality_preset}.rt-${rt}.fg-${fg}.${GAME_PROFILE_EXTENSION}"
+    fi
+
+    # Check if the exact profile file exists and copy it to the target settings location
+    if [[ -f "$exact_profile" ]]; then
+        # cp "$exact_profile" "$target_settings_file"
+        if [[ $? -eq 0 ]]; then
+            log_to_file success "$log" "Applied settings profile: $exact_profile"
+        else
+            log_to_file error "$log" "Failed to copy settings profile to $target_settings_file"
+            return 1
+        fi
+    else
+        log_to_file error "$log" "Required settings profile not found: $exact_profile"
+        if [[ -n "$test_name" ]]; then
+            log_to_file error "$log" "Expected profile file: ${USER_CONFIG_FILENAME}.${test_name}.${GAME_PROFILE_EXTENSION}"
+        else
+            # TODO: need to add the profile generation from params
+            log_to_file error "$log" "Available parameters: mode=$original_mode, quality=$quality_preset, ray_tracing=$rt, frame_generation=$fg"
+        fi
+        log_to_file warning "$log" "Please ensure the exact profile file exists in $profile_dir"
+        return 1
+    fi
+
+    # Verify that UserSettings.json exists after applying settings
+    if [[ ! -f "$target_settings_file" ]]; then
+        log_to_file error "$log" "${USER_CONFIG_FILENAME}.${test_name}.${GAME_PROFILE_EXTENSION} file does not exist at $target_settings_file"
+        log_to_file warning "$log" "Please ensure a valid settings profile was applied or the game has been configured."
+        return 1
+    fi
+    # Log the applied settings for reference
+    log_to_file info "$log" "Applied settings => mode=$original_mode resolution=$resolution quality=$quality_preset ray_tracing=$rt frame_generation=$fg"
+    if [[ -n "$test_name" ]]; then
+        log_to_file info "$log" "Profile selection method: test name ($test_name)"
+    else
+        log_to_file info "$log" "Profile selection method: parameter-based"
+    fi
+    return 0
+}
+
+
 # --------------------------------------------------------------------
 #  The core “run a single test” routine
 # Arguments:
@@ -556,15 +752,16 @@ run_test() {
 
     params=(${TESTS[$test_name]})
 
-    rs="${params[0]}"
-    rs_type="${params[1]}"
-    rs_preset="${params[2]}"
+    dx="${params[0]}"
+    rs="${params[1]}"
+    rs_type="${params[2]}"
+    rs_preset="${params[3]}"
 
-    resolution="${params[3]}"
-    quality="${params[4]}"
-    rt="${params[5]}"
-    rt_preset="${params[6]}"
-    frame_generation="${params[7]}"
+    resolution="${params[4]}"
+    quality="${params[5]}"
+    rt="${params[6]}"
+    rt_preset="${params[7]}"
+    frame_generation="${params[8]}"
 
     if [[ "$test_index" -gt 0 && "$total_tests" -gt 0 ]]; then
         log_to_file info "$logfile" "Running test ($test_index/$total_tests): $test_name"
@@ -572,10 +769,10 @@ run_test() {
         log_to_file info "$logfile" "Running test: $test_name"
     fi
 
-    log_to_file info "$logfile" "Parameters: rs=$rs rs_type=$rs_type rs_preset=$rs_preset resolution=$resolution quality=$quality rt=$rt rt_preset=$rt_preset fg=$frame_generation"
+    log_to_file info "$logfile" "Parameters: dx=$dx rs=$rs rs_type=$rs_type rs_preset=$rs_preset resolution=$resolution quality=$quality rt=$rt rt_preset=$rt_preset fg=$frame_generation"
 
     # Apply settings and run benchmark
-    if run_bench "$rs" "$rs_type" "$rs_preset" "$resolution" "$quality" "$rt" "$rt_preset" "$frame_generation" "$logfile" "$test_name" "$logfile" "$test_name"; then
+    if run_bench "$dx" "$rs" "$rs_type" "$rs_preset" "$resolution" "$quality" "$rt" "$rt_preset" "$frame_generation" "$logfile" "$test_name"; then
         log_to_file success "$logfile" "$test_name completed successfully"
         return 0
     else
@@ -586,6 +783,7 @@ run_test() {
 
 # Function to launch with a specific upscaling mode
 run_bench() {
+    local dx
     local rs
     local rs_type
     local rs_preset
@@ -602,16 +800,17 @@ run_bench() {
     local -a game_candidates
     local candidate_path
 
-    rs=$1
-    rs_type=$2
-    rs_preset=$3
-    resolution=$4
-    quality=${5:-low}
-    rt=${6:-off}
-    rt_preset=${7:-off}
-    frame_generation=${8:-off}
-    logfile=${9:-""}
-    test_name=${10:-""}
+    dx=${1}
+    rs=${2}
+    rs_type=${3}
+    rs_preset=${4}
+    resolution=${5}
+    quality=${6:-low}
+    rt=${7:-off}
+    rt_preset=${8:-off}
+    frame_generation=${9:-off}
+    logfile=${10:-""}
+    test_name=${11:-""}
 
     # Find Proton installation - check Steam root and custom library possible locations
     proton_candidates=(
@@ -638,6 +837,7 @@ run_bench() {
     )
     game_path=""
     for candidate_path in "${game_candidates[@]}"; do
+        log_debug "Checking for game in: $candidate_path"
         if is_path_directory "$candidate_path"; then
             game_path="$candidate_path"
             break
@@ -653,7 +853,7 @@ run_bench() {
 
     # Final check for the game executable
     local exe_path
-    exe_path="$game_path/$GANME_EXE_PATH$GAME_EXE"
+    exe_path="$game_path/$GAME_EXE_PATH$GAME_EXE"
     if ! is_path_file "$exe_path"; then
         log_to_file error "$log" "Game executable not found at $exe_path"
         return 1
@@ -670,7 +870,7 @@ run_bench() {
         launch_game_args+=("$arg")
     done
 
-    apply_setting "$rs" "$rs_type" "$rs_preset" "$resolution" "$quality" "$rt" "$rt_preset" "$frame_generation" "$logfile" "$test_name" || return 1
+    apply_setting "$dx" "$rs" "$rs_type" "$rs_preset" "$resolution" "$quality" "$rt" "$rt_preset" "$frame_generation" "$logfile" "$test_name"
 
     local -a proton_run_cmd
     proton_run_cmd=("$proton_path/proton")
@@ -732,12 +932,12 @@ run_bench() {
         register_background_helper "$!"
     fi
 
-    local exit_code
-    (
-        cd "$game_path" || exit 1
-        "${full_launch_cmd[@]}"
-    ) >>"$logfile" 2>&1
-    exit_code=$?
+    # local exit_code
+    # (
+    #     cd "$game_path" || exit 1
+    #     "${full_launch_cmd[@]}"
+    # ) >>"$logfile" 2>&1
+    # exit_code=$?
 
     # Check if the benchmark timed out (timeout exits with 124 if the command times out, and 137 if it had to be
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
@@ -756,7 +956,7 @@ run_bench() {
     # Check the exit code of the benchmark run and log accordingly
     if [[ $exit_code -eq 0 ]]; then
         # If the benchmark completed successfully, log a success message; otherwise, log an error with the exit code
-        log_to_file success "$logfile" "Benchmark completed successfully for $mode"
+        log_to_file success "$logfile" "Benchmark completed successfully for $test_name"
     else
         # If the benchmark failed, log an error message with the exit code
         log_to_file error "$logfile" "Benchmark failed for $mode (exit code: $exit_code)"
@@ -902,7 +1102,7 @@ main() {
     script_run_timestamp="$(benchmark_timestamp)"
     SCRIPT_RUN_TIMESTAMP="$script_run_timestamp"
     local logfile
-    logfile="${SCRIPT_DIR}/${GAME_SHORT_NAME}_benchmark_${script_run_timestamp}.log"
+    logfile="${SCRIPT_DIR}/logs/${GAME_SHORT_NAME}_benchmark_${script_run_timestamp}.log"
 
     # ----------------------------------------------------------------
     #  Command‑line parsing (exactly the options you asked for)
