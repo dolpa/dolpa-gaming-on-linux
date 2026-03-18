@@ -21,6 +21,13 @@ RUN_AUTOMATION_IN_PROD_MODE=false
 
 # Here the default definitions for the different parameters used in the test definitions (e.g. in games/ac-valhalla/benchmark/config/tests.conf.sh) are defined; you can customize these definitions for each game as needed, and you can also add more parameters if needed (e.g. for specific graphics settings or benchmark modes that are relevant for a specific game) 
 
+#DirectX Version (DX): "dx11" or "dx12"
+declare -A GAME_DIRECTX_VERSIONS
+GAME_DIRECTX_VERSIONS=(
+    ["dx11"]="dx11"           # DirectX 11
+    ["dx12"]="dx12"           # DirectX 12
+)
+
 # Resolution Scale (RS): "OFF" or "DLSS" (or "FSR21", "FRS3" and "XeSS" in other games)
 declare -A RESOLUTION_SCALE
 GAME_RESOLUTION_SCALE=(
