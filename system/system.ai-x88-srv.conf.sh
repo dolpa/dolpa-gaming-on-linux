@@ -6,7 +6,7 @@ STEAM_ROOT="${HOME}/.steam/root"                    # Alternative Steam root pat
 CUSTOM_LIBRARY_PATH="/mnt/VMData/Steam Library"         # Custom Steam library path
 PROTON_VERSION="GE-Proton9-27"
 
-ENABLE_MANGOHUD=1
+ENABLE_MANGOHUD=0
 ENABLE_GAMEMODERUN=0
 
 BENCHMARK_TIMEOUT_MINUTES=15
