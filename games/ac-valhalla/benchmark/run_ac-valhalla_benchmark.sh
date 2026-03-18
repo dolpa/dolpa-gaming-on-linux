@@ -41,7 +41,7 @@ SYSTEM_NAME="${SYSTEM_NAME// /_}"                   # replace any remaining spac
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 GAME_BENCHMARK_CONFIG_DEFAULT="${SCRIPT_DIR}/config/game.${GAME_SHORT_NAME}.conf.sh"  # default game‑specific config (can be overridden by the environment variable GAME_BENCHMARK_CONFIG)
 SYSTEM_CONFIG_OVERRIDE_FILE="${GAME_BENCHMARK_CONFIG:-}"   # <- env‑var
-
+echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 # --------------------------------------------------------------------
 #  Default values (can be overridden by the config files below)
 # --------------------------------------------------------------------
@@ -51,7 +51,7 @@ PROTON_VERSION_DEFAULT="GE-Proton10-32"     # default Proton version to use for 
 # Behaviour toggles
 ENABLE_MANGOHUD=0                           # Enable MangoHud overlay for all tests (if installed and detected by the shared library)
 ENABLE_GAMEMODERUN=0                        # Run the game under gamemode (if installed and detected by the shared library)
-BENCHMARK_TIMEOUT_MINUTES=15                # Default timeout for each benchmark test (in minutes) – can be overridden by --timeout-minutes; if BENCHMARK_TIMEOUT_SECONDS is set, it takes precedence over this value.
+BENCHMARK_TIMEOUT_MINUTES=7                 # Default timeout for each benchmark test (in minutes) – can be overridden by --timeout-minutes; if BENCHMARK_TIMEOUT_SECONDS is set, it takes precedence over this value.
 BENCHMARK_TIMEOUT_SECONDS=""                # if empty, it will be computed from BENCHMARK_TIMEOUT_MINUTES
 BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS=30     # If a test times out, wait this many seconds before force‑killing it (to allow for graceful shutdown)
 
@@ -69,6 +69,7 @@ declare -a BENCHMARK_HELPER_PIDS
 
 # Screenshot Variables
 _NUMBER_OF_SCREENSHOTS=1                     # Number of screenshots to take during the benchmark run (if NEED_TO_TAKE_SCREENSHOT_OF_RESULTS is true)
+echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 
 # --------------------------------------------------------------------
 #  Load the shared bash‑utils library (provides logging helpers, Bash utilities, …)
@@ -109,7 +110,7 @@ if [[ -f "${GLOBAL_BENCHMARK_CONFIG_FILE}" ]]; then
 else
     log_warning "No global benchmark config found at ${GLOBAL_BENCHMARK_CONFIG_FILE} – using defaults"
 fi
-
+echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 # 2) Game config (defaults for the specific game, shared across all machines – expected to live in the same folder as this script, but can be overridden by the environment variable GAME_BENCHMARK_CONFIG)
 log_info "Loading game benchmark config from ${GAME_BENCHMARK_CONFIG_DEFAULT}"
 if [[ -n "${GAME_BENCHMARK_CONFIG_DEFAULT}" && -f "${GAME_BENCHMARK_CONFIG_DEFAULT}" ]]; then
@@ -122,21 +123,20 @@ if [[ -n "${SYSTEM_CONFIG_OVERRIDE_FILE}" && -f "${SYSTEM_CONFIG_OVERRIDE_FILE}"
     # shellcheck source=/dev/null
     source "${SYSTEM_CONFIG_OVERRIDE_FILE}"
 fi
-
+echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 # --------------------------------------------------------------------
 #  Derived / helper variables (must be evaluated **after** the configs)
 # --------------------------------------------------------------------
-PROTON_VERSION="${GAME_PROTON_VERSION:-${PROTON_VERSION:-${PROTON_VERSION_DEFAULT}}}"
+PROTON_VERSION="${GAME_PROTON_VERSION:-${PROTON_VERSION:-${SYSTEM_PROTON_VERSION}}}"
 
 # Compute timeout in seconds if not explicitly set
 env_default BENCHMARK_TIMEOUT_SECONDS "$(( BENCHMARK_TIMEOUT_MINUTES * 60 ))"
 
 # Default user‑settings folder (Steam‑Play “compatdata” path)
-echo ">>>>>>>>>>  ${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_NAME}/"
 env_default USER_SETTINGS_FOLDER "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_NAME}/"
 
 # Default benchmark results source directory (where the game writes its CSVs)
-# env_default BENCHMARK_RESULTS_SOURCE_DIR "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
+env_default BENCHMARK_RESULTS_SOURCE_DIR "${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/${GAME_CREATOR_STUDIO}${GAME_NAME}/benchmarkResults/"
 
 # --------------------------------------------------------------------
 #  Load the benchmark‑specific test definitions
@@ -176,6 +176,7 @@ list_tests() {
         echo "  $t"
     done | sort
 }
+echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 
 # TODO: implement this function to list available graphic settings (e.g. quality presets, ray tracing modes, upscaling options, …) for use in the test definitions and documentation; you can adapt it to your specific game and settings structure
 list_graphic_settings() {
@@ -343,7 +344,8 @@ EOF
 # Helper function to check if xdotool is installed (used for automating menu navigation to start the benchmark); you can extend this function to check for other required tools as well
 go_to_menu_and_run_bench() {
 	local win_id=""
-	local attempts=$((AUTO_CLICK_TIMEOUT_SEC * 2))
+	local attempts
+    attempts=$((AUTO_CLICK_TIMEOUT_SEC * 2))
 	for _ in $(seq 1 "$attempts"); do
 		win_id="$(xdotool search --name "ASSASSIN'S CREED VALHALLA Benchmark" 2>/dev/null | head -n1 || true)"
 		if [[ -n "$win_id" ]]; then
@@ -440,7 +442,8 @@ take_screenshots_every_after_delay() {
 
     sleep "$delay_seconds"
     for i in $(seq 1 "$counter"); do
-        gnome-screenshot -f ${results_folder}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png >/dev/null 2>&1 || true
+        log_info "Taking screenshot #$i of $counter after $delay_seconds seconds delay and saving to ${BENCHMARK_RESULTS_OUTPUT_DIR}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png"
+        gnome-screenshot -f ${BENCHMARK_RESULTS_OUTPUT_DIR}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png >/dev/null 2>&1 || true
         sleep "$each_seconds"
     done
 
@@ -863,6 +866,16 @@ run_bench() {
     export STEAM_COMPAT_DATA_PATH="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
     export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_PATH"
 
+    # Add other environment variables needed for the game or Proton; you can customize this based on your game's requirements and how you want to configure Proton (e.g. enabling specific Proton features, setting up logging, etc.)
+    local env_var
+    local -a launch_game_env_args=()
+
+    for env_var in "${!RUN_ENVIRONMENT_VARIABLES[@]}"; do
+        launch_game_env_args+=( "${env_var}=${RUN_ENVIRONMENT_VARIABLES[$env_var]}" )
+    done
+
+    log_debug "Using launch_game_env_var: ${launch_game_env_args[*]}"
+
     local -a launch_game_args
     launch_game_args=()
     # Build Launch arguments based on the test parameters; you will need to adapt this to your game's specific command‑line options or configuration file handling
@@ -904,23 +917,22 @@ run_bench() {
     local -a full_launch_cmd=(
         timeout --foreground --signal=TERM --kill-after="${BENCHMARK_TIMEOUT_KILL_AFTER_SECONDS}s" "${BENCHMARK_TIMEOUT_SECONDS}s"
         env
+        "PROTON_LOG=1"
         "SteamAppId=${GAME_ID}"
         "SteamGameId=${GAME_ID}"
-        "PROTON_VERB=waitforexitandrun"
         "STEAM_COMPAT_CLIENT_INSTALL_PATH=$STEAM_PATH"
         "STEAM_COMPAT_DATA_PATH=$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID"
-        "STEAM_RUNTIME=1"
-        "PROTON_LOG=1"
-        "VKD3D_FEATURE_LEVEL=12_0"
+        "${launch_game_env_args[@]}" 
         "${proton_run_cmd[@]}" run
         "$exe_path"
         "${launch_game_args[@]}"
-
     )
 
     local full_launch_cmd_pretty=""
     printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
-    log_to_file info "$log" "Full launch command: cd $(printf '%q' "$game_path") && ${full_launch_cmd_pretty% }"
+    log_to_file info "$log" "Full launch command: ${full_launch_cmd_pretty% }"
+    
+    log_debug "Environment variables for launch: ${full_launch_cmd[@]}"
 
     # Go to menu and run the benchmark (you will need to adapt this to your specific game, e.g. by sending keystrokes or mouse clicks to navigate the menu and start the benchmark; the example below is just a placeholder and may not work for your game)
     if [[ ${NEED_TO_CLOCK_BENCHMARK_IN_MENU} ]]; then
@@ -928,16 +940,24 @@ run_bench() {
         register_background_helper "$!"
     fi
     if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
-        take_screenshots_every_after_delay 15 &
+        take_screenshots_every_after_delay 300 15 &
         register_background_helper "$!"
     fi
 
-    # local exit_code
-    # (
-    #     cd "$game_path" || exit 1
-    #     "${full_launch_cmd[@]}"
-    # ) >>"$logfile" 2>&1
-    # exit_code=$?
+    # Switch directory to game install directory if needed before launching the game
+    if [[ $NEED_CD_TO_GAME_DIR_BEFORE_LAUNCH == true ]]; then
+        log_debug "Changing directory to game path before launch: $game_path"
+        cd "$game_path" || {
+            log_to_file error "$logfile" "Failed to change directory to game path: $game_path"
+            return 1
+        }
+    fi
+
+    local exit_code
+    (
+        "${full_launch_cmd[@]}"
+    ) >>"$logfile" 2>&1
+    exit_code=$?
 
     # Check if the benchmark timed out (timeout exits with 124 if the command times out, and 137 if it had to be
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
@@ -961,6 +981,8 @@ run_bench() {
         # If the benchmark failed, log an error message with the exit code
         log_to_file error "$logfile" "Benchmark failed for $mode (exit code: $exit_code)"
     fi
+
+    # Need to wait for snapshot here
 
     # 
     if [[ $exit_code -eq 0 && ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
@@ -1001,6 +1023,8 @@ copy_benchmark_result_file() {
     output_dir="$BENCHMARK_RESULTS_OUTPUT_DIR"
 
     ensure_directory "$output_dir"
+
+    log_debug "Copying benchmark result file for test '$test_name' from source directory '$source_dir' to output directory '$output_dir' with GPU metadata tag '$GPU_METADATA_TAG' and timestamp '$SCRIPT_RUN_TIMESTAMP'"
 
     # Use the provided SCRIPT_RUN_TIMESTAMP environment variable if set; otherwise, generate a new timestamp for this run. This allows for consistent timestamps across multiple tests in the same run, while still having unique timestamps for separate runs.
     if [[ -z "$script_run_timestamp" ]]; then
@@ -1158,6 +1182,7 @@ main() {
     log_debug "Normalized arguments: ${normalized_args[*]}"
     
     args_parse "${normalized_args[@]}"
+    log_debug "ENABLE_MANGOHUD value: ${ENABLE_MANGOHUD}"
 
     for arg in "${ARGS_POSITIONAL[@]}"; do
         if [[ "$arg" == -* ]]; then
@@ -1196,6 +1221,7 @@ main() {
     fi
 
     if args_get_flag --mangohud >/dev/null 2>&1; then
+        log_debug "MangoHud override enabled via command line"
         ENABLE_MANGOHUD=1
         cli_mangohud_override=true
     fi
@@ -1293,7 +1319,6 @@ main() {
     log_to_file "info" "$logfile" "Steam library    : ${CUSTOM_LIBRARY_PATH}"
     log_to_file "info" "$logfile" "User settings    : ${USER_SETTINGS_FOLDER}"
     log_to_file "info" "$logfile" "Steam Path       : ${STEAM_PATH}"
-    log_to_file "info" "$logfile" "Proton Version   : ${PROTON_VERSION}"
     log_to_file "info" "$logfile" "GPU Metadata     : ${GPU_METADATA_TAG}"
     log_to_file "info" "$logfile" "Result source    : ${BENCHMARK_RESULTS_SOURCE_DIR}"
     log_to_file "info" "$logfile" "Result destination: ${BENCHMARK_RESULTS_OUTPUT_DIR}"
