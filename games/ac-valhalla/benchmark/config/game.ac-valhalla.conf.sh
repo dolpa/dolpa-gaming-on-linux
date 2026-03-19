@@ -16,7 +16,7 @@ BENCHMARK_RESULTS_SOURCE_DIR="$CUSTOM_LIBRARY_PATH/steamapps/compatdata/$GAME_ID
 GAME_PROFILE_EXTENSION="ini"
 USER_SETTINGS_FILE="${USER_SETTINGS_FOLDER}/ACValhalla.${GAME_PROFILE_EXTENSION}"   # Path to the user settings file that will be modified by the benchmark script to apply different configurations for each test; this should be the actual file used by the game to read user settings (e.g. graphics settings, controls, …) when the game is launched, so that modifying this file will change the game settings for the benchmark tests
 USER_CONFIG_FILENAME="ACValhalla"           # Base name for the User Settings files inside the installation directories (without the extention)
-NEED_CD_TO_GAME_DIR_BEFORE_LAUNCH = false   # Whether the benchmark script needs to change the current directory to the game directory before launching the game (some games require this for correct loading of assets, configs, …)
+NEED_CD_TO_GAME_DIR_BEFORE_LAUNCH=false     # Whether the benchmark script needs to change the current directory to the game directory before launching the game (some games require this for correct loading of assets, configs, …)
 
 RUN_AUTOMATION_IN_PROD_MODE=false           # Whether to run the benchmark automation in production mode (true) or in testing mode (false)
 
