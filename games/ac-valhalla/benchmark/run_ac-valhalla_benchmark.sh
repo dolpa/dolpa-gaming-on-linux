@@ -16,7 +16,7 @@ PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"        # root of the pr
 SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"                  # directory where system‑specific configuration files are expected to live (e.g. system.my‑pc.conf.sh)
 SYSTEM_NAME_DEFAULT=${SYSTEM_NAME:-"default"}                                         # default system name (can be overridden by the local config); if empty, it will be derived from the hostname
 GAME_SHORT_NAME="ac-valhalla"                                   # short name for the game (used for folder names, logs, …); should be lowercase and contain only letters, numbers and dashes/underscores
-DEFAULT_TEST_TO_RUN="native-1080p-low-rt-off"   # default test to run if no tests are specified via command‑line arguments; should be one of the keys in the TESTS array defined in config/tests.conf.sh (e.g. "native-1080p-low-rt-off")
+DEFAULT_TEST_TO_RUN="native-1080p-low-rt-off"   # default test to run if no tests are specified via command‑line arguments; should be one of the keys in the TESTS array defined in config/tests.conf.sh
 
 STEAM_PATH="${HOME}/.local/share/Steam"     # Base path to Steam (used for Proton, compatdata, …)
 STEAM_ROOT="${HOME}/.steam/root"            # Steam root path
@@ -41,7 +41,7 @@ SYSTEM_NAME="${SYSTEM_NAME// /_}"                   # replace any remaining spac
 SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
 GAME_BENCHMARK_CONFIG_DEFAULT="${SCRIPT_DIR}/config/game.${GAME_SHORT_NAME}.conf.sh"  # default game‑specific config (can be overridden by the environment variable GAME_BENCHMARK_CONFIG)
 SYSTEM_CONFIG_OVERRIDE_FILE="${GAME_BENCHMARK_CONFIG:-}"   # <- env‑var
-echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
+
 # --------------------------------------------------------------------
 #  Default values (can be overridden by the config files below)
 # --------------------------------------------------------------------
@@ -69,7 +69,6 @@ declare -a BENCHMARK_HELPER_PIDS
 
 # Screenshot Variables
 _NUMBER_OF_SCREENSHOTS=1                     # Number of screenshots to take during the benchmark run (if NEED_TO_TAKE_SCREENSHOT_OF_RESULTS is true)
-echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 
 # --------------------------------------------------------------------
 #  Load the shared bash‑utils library (provides logging helpers, Bash utilities, …)
@@ -110,7 +109,6 @@ if [[ -f "${GLOBAL_BENCHMARK_CONFIG_FILE}" ]]; then
 else
     log_warning "No global benchmark config found at ${GLOBAL_BENCHMARK_CONFIG_FILE} – using defaults"
 fi
-echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 # 2) Game config (defaults for the specific game, shared across all machines – expected to live in the same folder as this script, but can be overridden by the environment variable GAME_BENCHMARK_CONFIG)
 log_info "Loading game benchmark config from ${GAME_BENCHMARK_CONFIG_DEFAULT}"
 if [[ -n "${GAME_BENCHMARK_CONFIG_DEFAULT}" && -f "${GAME_BENCHMARK_CONFIG_DEFAULT}" ]]; then
@@ -123,7 +121,6 @@ if [[ -n "${SYSTEM_CONFIG_OVERRIDE_FILE}" && -f "${SYSTEM_CONFIG_OVERRIDE_FILE}"
     # shellcheck source=/dev/null
     source "${SYSTEM_CONFIG_OVERRIDE_FILE}"
 fi
-echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 # --------------------------------------------------------------------
 #  Derived / helper variables (must be evaluated **after** the configs)
 # --------------------------------------------------------------------
@@ -176,7 +173,6 @@ list_tests() {
         echo "  $t"
     done | sort
 }
-echo "ENABLE_MANGOHUD is: $ENABLE_MANGOHUD"
 
 # TODO: implement this function to list available graphic settings (e.g. quality presets, ray tracing modes, upscaling options, …) for use in the test definitions and documentation; you can adapt it to your specific game and settings structure
 list_graphic_settings() {
@@ -241,37 +237,57 @@ benchmark_timestamp() {
     time_format_epoch "$(time_epoch)" "%Y%m%d_%H%M%S" local
 }
 
+# Validate runtime dependencies using dolpa-bash-utils
 validate_runtime_dependencies() {
-    # Check if the required tools for the benchmark are installed (e.g. gnome-screenshot for taking screenshots, xdotool for automating menu navigation, …); you can extend this function to check for other dependencies as needed
+    local missing_deps=()
+    
+    log_debug "Validating runtime dependencies..."
+    
+    # Check if the required tools for the benchmark are installed
     if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS:-false} == true ]]; then
         if ! command_exists gnome-screenshot; then
-            log_error "gnome-screenshot is required to take screenshots of benchmark results. Please install it: sudo apt update && sudo apt install -y gnome-screenshot"
-            return 1
+            missing_deps+=("gnome-screenshot")
+            log_warning "gnome-screenshot is required to take screenshots of benchmark results."
         fi
-        # ImageMagick (magick) is not strictly required for taking screenshots, but it can be useful for processing them (e.g. cropping, resizing, …) before extracting the results; you can choose to make it a hard dependency or an optional one depending on your needs and how you implement the screenshot processing; if you decide to make it optional, you can check if it's installed and log a warning if it's not available, but still allow the script to run without it (with limited functionality for screenshot processing)
-        # if ! command_exists magick; then
-        #     log_error "ImageMagick (magick) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y imagemagick"
-        #     return 1
-        # fi
+        
         if ! command_exists ffmpeg; then
-            log_error "FFmpeg (ffmpeg) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y ffmpeg"
-            return 1
+            missing_deps+=("ffmpeg")
+            log_warning "FFmpeg is required to process benchmark screenshots."
         fi
+        
         if ! command_exists tesseract; then
-            log_error "Tesseract OCR (tesseract) is required to process benchmark screenshots. Please install it: sudo apt update && sudo apt install -y tesseract-ocr"
-            return 1
+            missing_deps+=("tesseract-ocr")
+            log_warning "Tesseract OCR is required to extract text from screenshots."
         fi
-        log_info "Screenshots of benchmark results will be taken using gnome-screenshot."
+        
+        if [[ ${#missing_deps[@]} -eq 0 ]]; then
+            log_info "All screenshot dependencies are available"
+        else
+            log_error "Missing dependencies for screenshots: ${missing_deps[*]}"
+        fi
     fi
 
-    # If we need to automate menu navigation to start the benchmark, check if xdotool is installed; you can adapt this to your specific game and how you plan to automate the menu navigation (e.g. by sending keystrokes, mouse clicks, …)
+    # Check if we need xdotool for menu automation
     if [[ ${NEED_TO_CLOCK_BENCHMARK_IN_MENU:-false} == true ]]; then
         if ! command_exists xdotool; then
-            log_error "xdotool is not installed; automatic benchmark menu navigation is unavailable."
-            return 1
+            missing_deps+=("xdotool")
+            log_warning "xdotool is required for automatic benchmark menu navigation."
         fi
     fi
 
+    # Check for coreutils/timeout (essential for benchmark execution)
+    if ! command_exists timeout; then
+        missing_deps+=("coreutils (timeout)")
+        log_error "timeout command is required to enforce time limits on benchmark runs."
+    fi
+
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_error "Missing required dependencies: ${missing_deps[*]}"
+        log_error "Please install the missing packages using your system package manager"
+        return 1
+    fi
+
+    log_success "All runtime dependencies validated successfully"
     return 0
 }
 
@@ -284,16 +300,29 @@ register_background_helper() {
     fi
 }
 
+# Improved cleanup function using dolpa-bash-utils
 cleanup_background_helpers() {
     local helper_pid
 
+    if [[ ${#BENCHMARK_HELPER_PIDS[@]} -eq 0 ]]; then
+        log_debug "No background helper processes to clean up"
+        return 0
+    fi
+
+    log_info "Cleaning up background helper processes..."
     for helper_pid in "${BENCHMARK_HELPER_PIDS[@]}"; do
         if exec_is_running "$helper_pid"; then
-            exec_kill "$helper_pid" >/dev/null 2>&1 || true
+            log_debug "Terminating helper process $helper_pid"
+            if ! exec_kill "$helper_pid" >/dev/null 2>&1; then
+                log_warning "Failed to terminate helper process $helper_pid"
+            fi
+        else
+            log_debug "Helper process $helper_pid already terminated"
         fi
     done
 
     BENCHMARK_HELPER_PIDS=()
+    log_success "Background helper cleanup completed"
 }
 
 # --------------------------------------------------------------------
@@ -496,6 +525,74 @@ extract_benchmark_results_from_screenshots_to_results() {
     done
 }
 
+# Validate configuration using dolpa-bash-utils
+validate_configuration() {
+    local validation_errors=()
+    
+    log_debug "Validating configuration..."
+    
+    # Required variables validation
+    if ! env_require "GAME_ID"; then
+        validation_errors+=("GAME_ID")
+    fi
+    
+    if ! env_require "GAME_NAME"; then
+        validation_errors+=("GAME_NAME")
+    fi
+    
+    if ! env_require "CUSTOM_LIBRARY_PATH"; then
+        validation_errors+=("CUSTOM_LIBRARY_PATH")
+    fi
+
+    # Directory validation using dolpa-bash-utils
+    if [[ -n "${CUSTOM_LIBRARY_PATH:-}" ]] && ! validate_directory "$CUSTOM_LIBRARY_PATH" "Steam library"; then
+        validation_errors+=("Steam library directory")
+    fi
+    
+    if [[ -n "${USER_SETTINGS_FOLDER:-}" ]] && ! validate_directory "$USER_SETTINGS_FOLDER" "User settings"; then
+        log_warning "User settings folder not found: $USER_SETTINGS_FOLDER (will be created if needed)"
+    fi
+    
+    # Proton validation
+    if [[ -n "${PROTON_VERSION:-}" ]]; then
+        local proton_found=false
+        local -a proton_paths=(
+            "${STEAM_PATH}/compatibilitytools.d/${PROTON_VERSION}"
+            "${STEAM_ROOT}/compatibilitytools.d/${PROTON_VERSION}"
+        )
+        
+        for path in "${proton_paths[@]}"; do
+            if validate_directory "$path" "Proton" 2>/dev/null; then
+                proton_found=true
+                break
+            fi
+        done
+        
+        if [[ "$proton_found" == false ]]; then
+            log_warning "Proton version ${PROTON_VERSION} not found in typical locations"
+        fi
+    fi
+    
+    # Validate timeout values
+    if [[ -n "${BENCHMARK_TIMEOUT_SECONDS:-}" ]]; then
+        if ! [[ "$BENCHMARK_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]]; then
+            validation_errors+=("BENCHMARK_TIMEOUT_SECONDS (must be numeric)")
+        fi
+    fi
+    
+    if [[ ${#validation_errors[@]} -gt 0 ]]; then
+        log_error "Configuration validation failed:"
+        for error in "${validation_errors[@]}"; do
+            log_error "  - $error"
+        done
+        return 1
+    fi
+    
+    log_success "Configuration validation passed"
+    return 0
+}
+
+# Validate benchmark profiles
 validate_profiles() {
     local missing_count
     local profiles_dir
@@ -858,7 +955,7 @@ run_bench() {
     local exe_path
     exe_path="$game_path/$GAME_EXE_PATH$GAME_EXE"
     if ! is_path_file "$exe_path"; then
-        log_to_file error "$log" "Game executable not found at $exe_path"
+        log_to_file error "$logfile" "Game executable not found at $exe_path"
         return 1
     fi
     
@@ -893,7 +990,7 @@ run_bench() {
         if app_is_installed gamemoderun; then
             proton_run_cmd=(gamemoderun "${proton_run_cmd[@]}")
         else
-            log_to_file error "$log" "--gamemode requested but 'gamemoderun' was not found in PATH."
+            log_to_file error "$logfile" "--gamemode requested but 'gamemoderun' was not found in PATH."
             return 1
         fi
     fi
@@ -902,14 +999,14 @@ run_bench() {
         if app_is_installed mangohud; then
             proton_run_cmd=("MANGOHUD=1" "${proton_run_cmd[@]}")
         else
-            log_to_file error "$log" "--mangohud requested but 'mangohud' was not found in PATH."
+            log_to_file error "$logfile" "--mangohud requested but 'mangohud' was not found in PATH."
             return 1
         fi
     fi
 
     # Check if the 'timeout' command is available (part of coreutils); we rely on it to enforce time limits on the benchmark runs
     if ! command_exists timeout; then
-        log_to_file error "$log" "Required command 'timeout' not found. Please install coreutils."
+        log_to_file error "$logfile" "Required command 'timeout' not found. Please install coreutils."
         return 1
     fi
 
@@ -930,7 +1027,7 @@ run_bench() {
 
     local full_launch_cmd_pretty=""
     printf -v full_launch_cmd_pretty '%q ' "${full_launch_cmd[@]}"
-    log_to_file info "$log" "Full launch command: ${full_launch_cmd_pretty% }"
+    log_to_file info "$logfile" "Full launch command: ${full_launch_cmd_pretty% }"
     
     log_debug "Environment variables for launch: ${full_launch_cmd[@]}"
 
@@ -979,7 +1076,7 @@ run_bench() {
         log_to_file success "$logfile" "Benchmark completed successfully for $test_name"
     else
         # If the benchmark failed, log an error message with the exit code
-        log_to_file error "$logfile" "Benchmark failed for $mode (exit code: $exit_code)"
+        log_to_file error "$logfile" "Benchmark failed for $test_name (exit code: $exit_code)"
     fi
 
     # Need to wait for snapshot here
@@ -1165,6 +1262,18 @@ main() {
 
     detect_gpu_metadata  # populate GPU_METADATA_TAG with the detected GPU info (sanitized for use in filenames and tags)
 
+    # Validate configuration before proceeding
+    if ! validate_configuration; then
+        log_error "Configuration validation failed. Please fix the configuration and try again."
+        exit 1
+    fi
+    
+    # Validate runtime dependencies
+    if ! validate_runtime_dependencies; then
+        log_error "Runtime dependency validation failed. Please install missing dependencies."
+        exit 1
+    fi
+
     for arg in "$@"; do
         case "$arg" in
             -h)
@@ -1176,14 +1285,21 @@ main() {
         esac
     done
 
+    # Initialize and parse command-line arguments
     args_set_flags --help --list --groups --validate-profiles --gamemode --mangohud --proton --native --all
     args_set_values --show-test --proton-version --group --timeout-minutes
 
     log_debug "Normalized arguments: ${normalized_args[*]}"
     
-    args_parse "${normalized_args[@]}"
+    if ! args_parse "${normalized_args[@]}"; then
+        log_error "Failed to parse command-line arguments"
+        show_help
+        exit 1
+    fi
+    
     log_debug "ENABLE_MANGOHUD value: ${ENABLE_MANGOHUD}"
 
+    # Check for unknown options among positional arguments
     for arg in "${ARGS_POSITIONAL[@]}"; do
         if [[ "$arg" == -* ]]; then
             log_error "Unknown option $arg"
@@ -1365,8 +1481,9 @@ main() {
     successful_tests=()
     current_test_index=0
 
+    # Setup signal handling for graceful cleanup
     trap_on_exit cleanup_background_helpers
-    trap_signals INT TERM
+    trap_on_signal cleanup_background_helpers INT TERM
     
     # ----------------------------------------------------------------
     #  Run the selected tests one‑by‑one, logging everything through the
