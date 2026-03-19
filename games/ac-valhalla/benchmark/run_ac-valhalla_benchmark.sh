@@ -109,6 +109,7 @@ if [[ -f "${GLOBAL_BENCHMARK_CONFIG_FILE}" ]]; then
 else
     log_warning "No global benchmark config found at ${GLOBAL_BENCHMARK_CONFIG_FILE} – using defaults"
 fi
+
 # 2) Game config (defaults for the specific game, shared across all machines – expected to live in the same folder as this script, but can be overridden by the environment variable GAME_BENCHMARK_CONFIG)
 log_info "Loading game benchmark config from ${GAME_BENCHMARK_CONFIG_DEFAULT}"
 if [[ -n "${GAME_BENCHMARK_CONFIG_DEFAULT}" && -f "${GAME_BENCHMARK_CONFIG_DEFAULT}" ]]; then
@@ -121,6 +122,7 @@ if [[ -n "${SYSTEM_CONFIG_OVERRIDE_FILE}" && -f "${SYSTEM_CONFIG_OVERRIDE_FILE}"
     # shellcheck source=/dev/null
     source "${SYSTEM_CONFIG_OVERRIDE_FILE}"
 fi
+
 # --------------------------------------------------------------------
 #  Derived / helper variables (must be evaluated **after** the configs)
 # --------------------------------------------------------------------
@@ -464,6 +466,7 @@ take_screenshots_every_after_delay() {
     local delay_seconds
     local each_seconds
     local counter
+    local screenshot_path
 
     delay_seconds="${1:-300}"
     each_seconds="${2:-20}"
@@ -471,8 +474,12 @@ take_screenshots_every_after_delay() {
 
     sleep "$delay_seconds"
     for i in $(seq 1 "$counter"); do
-        log_info "Taking screenshot #$i of $counter after $delay_seconds seconds delay and saving to ${BENCHMARK_RESULTS_OUTPUT_DIR}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png"
-        gnome-screenshot -f ${BENCHMARK_RESULTS_OUTPUT_DIR}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png >/dev/null 2>&1 || true
+        screenshot_path="${BENCHMARK_RESULTS_OUTPUT_DIR}/screenshot_${SHORT_GAME_NAME}_${test_name}_${script_run_timestamp}_${i}.png"
+        log_info "Taking screenshot #$i of $counter after $delay_seconds seconds delay and saving to ${screenshot_path}"
+        if ! gnome-screenshot -f "$screenshot_path" >/dev/null 2>&1; then
+            log_error "Failed to take screenshot #$i: ${screenshot_path}"
+            return 1
+        fi
         sleep "$each_seconds"
     done
 
@@ -899,6 +906,12 @@ run_bench() {
     local -a proton_candidates
     local -a game_candidates
     local candidate_path
+    local screenshot_helper_pid
+    local screenshot_helper_exit_code
+    local screenshot_delay_seconds
+    local screenshot_interval_seconds
+    local screenshot_counter
+    local screenshot_helper_timeout_seconds
 
     dx=${1}
     rs=${2}
@@ -911,6 +924,15 @@ run_bench() {
     frame_generation=${9:-off}
     logfile=${10:-""}
     test_name=${11:-""}
+    screenshot_helper_pid=""
+    screenshot_helper_exit_code=0
+    screenshot_delay_seconds=300
+    screenshot_interval_seconds=15
+    screenshot_counter="${_NUMBER_OF_SCREENSHOTS:-1}"
+    if [[ ! "$screenshot_counter" =~ ^[0-9]+$ || "$screenshot_counter" -lt 1 ]]; then
+        screenshot_counter=1
+    fi
+    screenshot_helper_timeout_seconds=$((screenshot_delay_seconds + (screenshot_interval_seconds * screenshot_counter) + 60))
 
     # Find Proton installation - check Steam root and custom library possible locations
     proton_candidates=(
@@ -1037,8 +1059,9 @@ run_bench() {
         register_background_helper "$!"
     fi
     if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
-        take_screenshots_every_after_delay 300 15 &
-        register_background_helper "$!"
+        take_screenshots_every_after_delay "$screenshot_delay_seconds" "$screenshot_interval_seconds" "$screenshot_counter" &
+        screenshot_helper_pid="$!"
+        register_background_helper "$screenshot_helper_pid"
     fi
 
     # Switch directory to game install directory if needed before launching the game
@@ -1055,6 +1078,8 @@ run_bench() {
         "${full_launch_cmd[@]}"
     ) >>"$logfile" 2>&1
     exit_code=$?
+
+
 
     # Check if the benchmark timed out (timeout exits with 124 if the command times out, and 137 if it had to be
     if [[ $exit_code -eq 124 || $exit_code -eq 137 ]]; then
@@ -1079,9 +1104,29 @@ run_bench() {
         log_to_file error "$logfile" "Benchmark failed for $test_name (exit code: $exit_code)"
     fi
 
-    # Need to wait for snapshot here
+    # Wait for the background screenshot helper to finish before continuing.
+    if [[ -n "$screenshot_helper_pid" ]]; then
+        log_to_file info "$logfile" "Waiting for snapshot helper (PID ${screenshot_helper_pid}) with timeout ${screenshot_helper_timeout_seconds}s..."
 
-    # 
+        exec_wait_result "$screenshot_helper_pid" "$screenshot_helper_timeout_seconds"
+        screenshot_helper_exit_code=$?
+
+        if [[ $screenshot_helper_exit_code -eq 0 ]]; then
+            log_to_file success "$logfile" "Snapshot helper completed successfully"
+        elif [[ $screenshot_helper_exit_code -eq 124 ]]; then
+            log_to_file error "$logfile" "Snapshot helper timed out after ${screenshot_helper_timeout_seconds}s"
+            exec_kill "$screenshot_helper_pid" >/dev/null 2>&1 || true
+        else
+            log_to_file error "$logfile" "Snapshot helper failed (exit code: ${screenshot_helper_exit_code})"
+        fi
+
+        if [[ $screenshot_helper_exit_code -ne 0 && $exit_code -eq 0 ]]; then
+            return 1
+        fi
+    fi
+    
+
+    # Analize the images and extract the benchmark results
     if [[ $exit_code -eq 0 && ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
         # If the benchmark completed successfully, it's time to extract the results from the screenshots; you can implement the extraction logic in the extract_benchmark_results_from_screenshots_to_results function, or if you have a custom function for this specific game, you can call it here (just make sure to define it in the game config file or the global benchmark config file)
         if declare -F "$CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION" > /dev/null; then
