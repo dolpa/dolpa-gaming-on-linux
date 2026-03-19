@@ -1,123 +1,200 @@
 # Assassin's Creed Valhalla Benchmark Suite
 
-This directory contains automated benchmark scripts for Assassin's Creed Valhalla.
+This directory contains an automated benchmark framework for Assassin's Creed Valhalla on Linux (Steam + Proton).
+
+It is designed for repeatable test runs across multiple graphics presets and resolutions, with structured logs and captured benchmark outputs for later analysis.
 
 ## Overview
 
-The benchmark suite is designed to run comprehensive performance tests on AC Valhalla with various graphics settings, upscaling technologies, and configurations.
+The benchmark runner combines:
 
-## Key Features
+- Reproducible test definitions (single tests and groups)
+- Profile-based game settings per test
+- Automated game launch with Proton and environment variables
+- Optional menu automation for benchmark start
+- Screenshot-based result capture with OCR processing
+- Standardized logs, timeout handling, and cleanup
 
-- **Automated benchmark execution** with configurable test suites
-- **Multiple upscaling technologies** support (DLSS, FSR, XeSS)
-- **Comprehensive test groups** for systematic performance analysis
-- **Screenshot capture** and OCR result extraction
-- **Robust error handling** and logging
-- **System configuration** support for different hardware setups
+## Automation Pipeline
 
-## Recent Improvements (2024)
+```text
+Config -> Profile Apply -> Launch -> Trigger -> Wait/Timeout -> Capture -> OCR/Copy -> Cleanup
+```
 
-### Enhanced Error Handling
-- Fixed debug output statements left in production code
-- Corrected syntax errors in configuration files
-- Improved logging consistency throughout the script
+1. Config loading
+- Loads system, global, and game-specific configuration files.
 
-### Better Use of dolpa-bash-utils
-- **Configuration validation** using `env_require()` and `validate_directory()`
-- **Runtime dependency checking** with better error messages
-- **Signal handling** for graceful cleanup of background processes
-- **Improved logging** with proper log levels and formatting
+2. Profile apply
+- Selects and applies a profile for the requested test (resolution, quality, upscaling, RT, FG).
 
-### Test Configuration
-- Updated test definitions specifically for AC Valhalla
-- Added comprehensive test groups for different scenarios
-- Proper resolution definitions and game-specific settings
+3. Launch
+- Starts Valhalla via Proton using configured launch flags and environment variables.
 
-### Code Quality
-- Fixed variable name bugs and logging inconsistencies
-- Better command-line argument parsing with error handling
-- Improved background process cleanup and resource management
+4. Trigger
+- Optionally uses xdotool to click through the benchmark menu.
+
+5. Wait and timeout
+- Uses timeout to enforce per-test limits and avoid hanging runs.
+
+6. Capture and extract
+- Takes result screenshots, crops result areas, preprocesses images, and runs OCR.
+- Can also copy summary output from benchmark result folders when available.
+
+7. Cleanup
+- Stops helper processes, closes remaining Wine/Proton processes, and writes final logs.
+
+## Project Layout
+
+```text
+ac-valhalla/
+├── benchmark/
+│   ├── run_ac-valhalla_benchmark.sh
+│   ├── config/
+│   │   ├── game.ac-valhalla.conf.sh
+│   │   ├── tests.conf.sh
+│   │   └── groups.conf.sh
+│   ├── profiles/
+│   ├── results/
+│   └── logs/
+└── README.md
+```
+
+## Requirements
+
+Core:
+
+- Linux system
+- Bash 5+
+- Steam installation with Assassin's Creed Valhalla
+- Proton (GE-Proton recommended)
+
+Required runtime tools (validated by script):
+
+- xdotool (menu automation, when enabled)
+- gnome-screenshot (result capture, when enabled)
+- ffmpeg (image preprocessing)
+- tesseract (OCR)
+- timeout (coreutils)
+
+Also used in default OCR flow:
+
+- GraphicsMagick (`gm` command)
+
+Optional:
+
+- gamemoderun
+- mangohud
+
+## Configuration Hierarchy
+
+The runner uses layered configuration. Later files override earlier values.
+
+1. System-specific config:
+- `system/system.<hostname>.conf.sh`
+
+2. Global benchmark config:
+- `games/etc/benchmark.config.sh`
+
+3. Game config:
+- `games/ac-valhalla/benchmark/config/game.ac-valhalla.conf.sh`
+
+4. Environment override:
+- `GAME_BENCHMARK_CONFIG=/path/to/custom.conf.sh`
 
 ## Usage
 
-### Running Individual Tests
+Run from the game directory:
+
+```bash
+cd games/ac-valhalla
+```
+
+Show help:
+
+```bash
+./benchmark/run_ac-valhalla_benchmark.sh --help
+```
+
+Run one test:
+
 ```bash
 ./benchmark/run_ac-valhalla_benchmark.sh native-1080p-high-rt-off
 ```
 
-### Running Test Groups
+Run a group:
+
 ```bash
 ./benchmark/run_ac-valhalla_benchmark.sh --group quick
 ./benchmark/run_ac-valhalla_benchmark.sh --group dlss-comparison
 ```
 
-### Available Options
-- `--help` - Show usage information
-- `--list` - List all available tests
-- `--groups` - List all test groups
-- `--validate-profiles` - Validate that all test profiles exist
-- `--proton` / `--native` - Choose execution mode
-- `--gamemode` - Enable gamemode integration
-- `--mangohud` - Enable MangoHUD overlay
-- `--timeout-minutes <N>` - Set per-test timeout
+Run all tests:
 
-### Configuration
+```bash
+./benchmark/run_ac-valhalla_benchmark.sh --all
+```
 
-The script uses a multi-tier configuration system:
+List tests and groups:
 
-1. **System-specific config**: `system/system.<hostname>.conf.sh`
-2. **Game-specific config**: `config/game.ac-valhalla.conf.sh`
-3. **Environment override**: `GAME_BENCHMARK_CONFIG` variable
+```bash
+./benchmark/run_ac-valhalla_benchmark.sh --list
+./benchmark/run_ac-valhalla_benchmark.sh --groups
+```
+
+Validate profile coverage:
+
+```bash
+./benchmark/run_ac-valhalla_benchmark.sh --validate-profiles
+```
+
+## Command Options
+
+- `--help` Show usage details
+- `--list` List available tests
+- `--groups` List available groups
+- `--group <name>` Run one named test group
+- `--all` Run all tests
+- `--show-test <test-name>` Show parsed test definition
+- `--validate-profiles` Verify required profile files exist
+- `--proton` Force Proton mode (default)
+- `--native` Force native mode
+- `--proton-version <version>` Override Proton version
+- `--timeout-minutes <N>` Override per-test timeout
+- `--gamemode` Enable gamemode wrapper
+- `--mangohud` Enable MangoHud
 
 ## Test Groups
 
-- **quick**: Fast comparison across resolutions
-- **native-comparison**: Native rendering comparison
-- **dlss-comparison**: DLSS upscaling tests
-- **4k-upscaling**: 4K performance with various upscaling
-- **all-native**: Complete native rendering test suite
+Current groups include:
 
-## Dependencies
+- `quick`
+- `native-comparison`
+- `native-1080p-scaling`
+- `native-1440p-scaling`
+- `native-4k-scaling`
+- `all-native`
+- `dlss-comparison`
+- `4k-upscaling`
 
-Required tools (automatically validated):
-- `gnome-screenshot` (for result screenshots)
-- `ffmpeg` (for image processing)
-- `tesseract-ocr` (for OCR text extraction)
-- `xdotool` (for menu automation)
-- `timeout` (from coreutils)
+See current definitions in `benchmark/config/groups.conf.sh`.
 
-Optional tools:
-- `gamemode` (for performance optimization)
-- `mangohud` (for performance overlay)
+## Outputs
 
-## File Structure
+- Logs: `benchmark/logs/`
+- Screenshots and extracted artifacts: `benchmark/results/`
+- Copied benchmark summary files (when available): `benchmark/results/*.json`
 
-```
-ac-valhalla/
-├── benchmark/
-│   ├── run_ac-valhalla_benchmark.sh    # Main script
-│   ├── config/
-│   │   ├── game.ac-valhalla.conf.sh    # Game configuration
-│   │   ├── tests.conf.sh               # Test definitions
-│   │   └── groups.conf.sh              # Test group definitions
-│   ├── profiles/                       # Game setting profiles
-│   ├── results/                        # Benchmark results
-│   └── logs/                          # Execution logs
-└── README.md                          # This file
-```
+Result filenames include test name, GPU metadata tag, and run timestamp for easier comparison.
 
-## Contributing
+## Extending and Customizing
 
-When adding new tests or modifying the script:
+- Add or adjust tests in `benchmark/config/tests.conf.sh`
+- Add or adjust groups in `benchmark/config/groups.conf.sh`
+- Tune launch/env settings in `benchmark/config/game.ac-valhalla.conf.sh`
+- Implement a custom OCR/result parser in the game config and set:
+   - `CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION`
 
-1. Use the dolpa-bash-utils library functions for consistency
-2. Follow the established logging patterns
-3. Test configuration validation before deployment
-4. Update test groups and documentation as needed
+## Notes
 
-## System Requirements
-
-- Linux system with Steam and Proton
-- AC Valhalla installed in Steam library
-- Sufficient disk space for logs and results
-- Graphics drivers supporting the tested upscaling technologies
+- Run the game manually at least once before benchmarking so settings and compatdata paths exist.
+- For reliable comparisons, keep driver version, Proton version, and background load stable between runs.
