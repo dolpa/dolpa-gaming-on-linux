@@ -1,0 +1,732 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+SYSTEM_NAME_DEFAULT="$(hostname -s 2>/dev/null || echo "default")"
+SYSTEM_NAME_DEFAULT="${SYSTEM_NAME_DEFAULT,,}"
+SYSTEM_NAME_DEFAULT="$(printf '%s' "$SYSTEM_NAME_DEFAULT" | sed -E 's/pavel//g; s/dolpa//g; s/[-_.]+/-/g; s/^-+|-+$//g')"
+if [[ -z "$SYSTEM_NAME_DEFAULT" ]]; then
+	SYSTEM_NAME_DEFAULT="default"
+fi
+SYSTEM_NAME="${METRO_EXODUS_SYSTEM_NAME:-${SYSTEM_NAME:-$SYSTEM_NAME_DEFAULT}}"
+SYSTEM_NAME="${SYSTEM_NAME// /_}"
+
+SYSTEM_CONFIG_DIR="${PROJECT_ROOT_DIR}/system"
+SYSTEM_CONFIG_LOCAL_FILE="${SYSTEM_CONFIG_DIR}/system.${SYSTEM_NAME}.conf.sh"
+SYSTEM_CONFIG_OVERRIDE_FILE="${METRO_EXODUS_BENCHMARK_CONFIG:-}"
+METRO_EXODUS_PROTON_VERSION_DEFAULT="GE-Proton9-27"
+GAME_ID=412020
+STEAM_PATH="${HOME}/.local/share/Steam"
+CUSTOM_LIBRARY_PATH="/mnt/Data/Games/Steam"
+
+RESULTS_DIR="${SCRIPT_DIR}/results"
+PROFILES_DIR="${SCRIPT_DIR}/profiles"
+NATIVE_PREFERENCES_PROFILE_SUFFIX=".preferences.xml"
+TESTS_CONFIG_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+GROUPS_CONFIG_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+TESTS_CONFIG_NATIVE_FILE="${SCRIPT_DIR}/config/tests.native.conf.sh"
+TESTS_CONFIG_PROTON_FILE="${SCRIPT_DIR}/config/tests.proton.conf.sh"
+GROUPS_CONFIG_NATIVE_FILE="${SCRIPT_DIR}/config/groups.native.conf.sh"
+GROUPS_CONFIG_PROTON_FILE="${SCRIPT_DIR}/config/groups.proton.conf.sh"
+TEMPLATE_FILE="${RESULTS_DIR}/metro_exodus_benchmark_report_template.md"
+LATEST_REPORT_FILE="${RESULTS_DIR}/metro_exodus_benchmark_report.md"
+TIMESTAMPED_REPORT_FILE="${RESULTS_DIR}/metro_exodus_benchmark_report_$(date +%Y%m%d_%H%M%S).md"
+BASH_UTILS_LOADER="${SCRIPT_DIR}/../../../dolpa-bash-utils/bash-utils.sh"
+GAME_README_FILE="${SCRIPT_DIR}/../README.md"
+TEST_RESULTS_START_MARKER="<!-- TEST_RESULTS_START -->"
+TEST_RESULTS_END_MARKER="<!-- TEST_RESULTS_END -->"
+TEST_RESULTS_PLACEHOLDER="- _No reports added yet._"
+
+if [[ -f "$SYSTEM_CONFIG_LOCAL_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$SYSTEM_CONFIG_LOCAL_FILE"
+fi
+
+if [[ -n "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
+	if [[ ! -f "$SYSTEM_CONFIG_OVERRIDE_FILE" ]]; then
+		echo "Error: METRO_EXODUS_BENCHMARK_CONFIG file not found: $SYSTEM_CONFIG_OVERRIDE_FILE" >&2
+		exit 1
+	fi
+	# shellcheck source=/dev/null
+	source "$SYSTEM_CONFIG_OVERRIDE_FILE"
+fi
+
+# Proton selection precedence:
+# 1) METRO_EXODUS_PROTON_VERSION (game-specific override)
+# 2) METRO_EXODUS_PROTON_VERSION_DEFAULT (game default)
+# 3) PROTON_VERSION (shared system default)
+PROTON_VERSION="${METRO_EXODUS_PROTON_VERSION:-${METRO_EXODUS_PROTON_VERSION_DEFAULT:-${PROTON_VERSION:-}}}"
+
+REPORT_SYSTEM_OS="${REPORT_SYSTEM_OS:-Ubuntu 24.04.4 LTS}"
+REPORT_SYSTEM_KERNEL="${REPORT_SYSTEM_KERNEL:-6.17.0-14-generic}"
+REPORT_SYSTEM_CPU="${REPORT_SYSTEM_CPU:-Intel Core Ultra 7 265KF}"
+REPORT_SYSTEM_GPU="${REPORT_SYSTEM_GPU:-NVIDIA GeForce RTX 5060}"
+REPORT_SYSTEM_GPU_DRIVER="${REPORT_SYSTEM_GPU_DRIVER:-NVIDIA 590.48.01}"
+REPORT_SYSTEM_RAM="${REPORT_SYSTEM_RAM:-48 GB}"
+REPORT_SYSTEM_PROTON="${REPORT_SYSTEM_PROTON:-${PROTON_VERSION:-}}"
+
+if [[ -z "${BENCHMARK_RESULTS_SOURCE_DIR:-}" ]]; then
+	local_native_results_dir="${HOME}/.local/share/feral-interactive/Metro Exodus/SaveData"
+	local_proton_results_dir="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Metro Exodus/"
+	local_proton_results_dir_alt="${CUSTOM_LIBRARY_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Metro Exodus/"
+	local_steam_results_dir="${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/Documents/Metro Exodus/"
+	local_steam_results_dir_alt="${STEAM_PATH}/steamapps/compatdata/${GAME_ID}/pfx/drive_c/users/steamuser/My Documents/Metro Exodus/"
+
+	if [[ -d "$local_native_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+	elif [[ -d "$local_proton_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir"
+	elif [[ -d "$local_proton_results_dir_alt" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_proton_results_dir_alt"
+	elif [[ -d "$local_steam_results_dir" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_steam_results_dir"
+	elif [[ -d "$local_steam_results_dir_alt" ]]; then
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_steam_results_dir_alt"
+	else
+		BENCHMARK_RESULTS_SOURCE_DIR="$local_native_results_dir"
+	fi
+fi
+
+if [[ ! -f "$BASH_UTILS_LOADER" ]]; then
+	echo "Error: dolpa-bash-utils loader not found: $BASH_UTILS_LOADER" >&2
+	exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$BASH_UTILS_LOADER"
+
+if [[ -f "$TESTS_CONFIG_NATIVE_FILE" ]]; then
+	TESTS_CONFIG_FILE="$TESTS_CONFIG_NATIVE_FILE"
+elif [[ -f "$LEGACY_TESTS_CONFIG_FILE" ]]; then
+	TESTS_CONFIG_FILE="$LEGACY_TESTS_CONFIG_FILE"
+elif [[ ! -f "$TESTS_CONFIG_FILE" ]]; then
+	log_error "Tests config file not found: $TESTS_CONFIG_FILE"
+	exit 1
+fi
+
+if [[ -f "$GROUPS_CONFIG_NATIVE_FILE" ]]; then
+	GROUPS_CONFIG_FILE="$GROUPS_CONFIG_NATIVE_FILE"
+elif [[ -f "$LEGACY_GROUPS_CONFIG_FILE" ]]; then
+	GROUPS_CONFIG_FILE="$LEGACY_GROUPS_CONFIG_FILE"
+elif [[ ! -f "$GROUPS_CONFIG_FILE" ]]; then
+	log_error "Test groups config file not found: $GROUPS_CONFIG_FILE"
+	exit 1
+fi
+
+mkdir -p "$RESULTS_DIR"
+
+declare -A TESTS
+declare -A TEST_GROUPS
+
+declare -a REQUESTED_TESTS=()
+declare -a REQUESTED_GROUPS=()
+declare -a SELECTED_TESTS=()
+
+# shellcheck source=/dev/null
+source "$TESTS_CONFIG_FILE"
+# shellcheck source=/dev/null
+source "$GROUPS_CONFIG_FILE"
+
+if [[ -f "$TESTS_CONFIG_PROTON_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$TESTS_CONFIG_PROTON_FILE"
+fi
+
+if [[ -f "$GROUPS_CONFIG_PROTON_FILE" ]]; then
+	# shellcheck source=/dev/null
+	source "$GROUPS_CONFIG_PROTON_FILE"
+fi
+
+show_help() {
+	echo "Metro Exodus Benchmark Results Analyzer"
+	echo "Usage: $0 [OPTIONS] [TEST_NAME ...]"
+	echo
+	echo "OPTIONS:"
+	echo "  --help, -h            Show this help message"
+	echo "  --group GROUP_NAME    Include all tests from a group (repeatable)"
+	echo "  --list-tests          List all available test names"
+	echo "  --list-groups         List available test groups"
+	echo
+	echo "FILTERING:"
+	echo "  - If no tests/groups are specified, all tests are considered."
+	echo "  - Positional arguments are treated as test names."
+	echo "  - You can combine --group and explicit test names."
+	echo
+	echo "Examples:"
+	echo "  $0"
+	echo "  $0 --group native-quick"
+	echo "  $0 --group proton-quick"
+	echo "  $0 --group native-4k-scaling native-4k-high-rt-off"
+}
+
+list_tests() {
+	echo "Available tests:"
+	printf '%s\n' "${!TESTS[@]}" | sort
+}
+
+list_groups() {
+	echo "Available groups:"
+	for group_name in "${!TEST_GROUPS[@]}"; do
+		echo "  $group_name: ${TEST_GROUPS[$group_name]}"
+	done | sort
+}
+
+parse_arguments() {
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--help|-h)
+				show_help
+				exit 0
+				;;
+			--list-tests)
+				list_tests
+				exit 0
+				;;
+			--list-groups)
+				list_groups
+				exit 0
+				;;
+			--group)
+				if [[ -z "${2:-}" ]]; then
+					log_error "--group requires a group name"
+					exit 1
+				fi
+				REQUESTED_GROUPS+=("$2")
+				shift 2
+				;;
+			-*)
+				log_error "Unknown option $1"
+				log_error "Use --help for usage information."
+				exit 1
+				;;
+			*)
+				REQUESTED_TESTS+=("$1")
+				shift
+				;;
+		esac
+	done
+}
+
+select_tests_for_report() {
+	local -A seen=()
+
+	if [[ ${#REQUESTED_GROUPS[@]} -eq 0 && ${#REQUESTED_TESTS[@]} -eq 0 ]]; then
+		mapfile -t SELECTED_TESTS < <(printf '%s\n' "${!TESTS[@]}" | sort)
+		return
+	fi
+
+	for group_name in "${REQUESTED_GROUPS[@]}"; do
+		if [[ -z "${TEST_GROUPS[$group_name]+isset}" ]]; then
+			log_error "Unknown test group '$group_name'. Use --list-groups to inspect available groups."
+			exit 1
+		fi
+
+		read -ra group_tests <<<"${TEST_GROUPS[$group_name]}"
+		for test_name in "${group_tests[@]}"; do
+			if [[ -z "${TESTS[$test_name]+isset}" ]]; then
+				log_error "Group '$group_name' references unknown test '$test_name'."
+				exit 1
+			fi
+			if [[ -z "${seen[$test_name]+isset}" ]]; then
+				SELECTED_TESTS+=("$test_name")
+				seen["$test_name"]=1
+			fi
+		done
+	done
+
+	for test_name in "${REQUESTED_TESTS[@]}"; do
+		if [[ -z "${TESTS[$test_name]+isset}" ]]; then
+			log_error "Unknown test '$test_name'. Use --list-tests to inspect available tests."
+			exit 1
+		fi
+		if [[ -z "${seen[$test_name]+isset}" ]]; then
+			SELECTED_TESTS+=("$test_name")
+			seen["$test_name"]=1
+		fi
+	done
+
+	if [[ ${#SELECTED_TESTS[@]} -eq 0 ]]; then
+		log_error "No tests selected for reporting."
+		exit 1
+	fi
+}
+
+augment_tests_with_fg_variants() {
+	for base_test_name in "${!TESTS[@]}"; do
+		if [[ "$base_test_name" == *-fg* ]]; then
+			continue
+		fi
+
+		for fg_suffix in "fg-dlss" "fg-frs31" "fg"; do
+			local fg_test_name="${base_test_name}-${fg_suffix}"
+			local fg_profile_file_metro_exodus="${PROFILES_DIR}/${fg_test_name}${NATIVE_PREFERENCES_PROFILE_SUFFIX}"
+
+			if [[ -f "$fg_profile_file_metro_exodus" && -z "${TESTS[$fg_test_name]+isset}" ]]; then
+				read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$base_test_name]}"
+				case "$fg_suffix" in
+					fg-dlss)
+						TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing fg-dlss"
+						;;
+					fg-frs31)
+						TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing fg-frs31"
+						;;
+					*)
+						TESTS["$fg_test_name"]="$mode $resolution $quality $ray_tracing on"
+						;;
+				esac
+			fi
+		done
+	done
+}
+
+extract_fps_triplet() {
+	local json_file="$1"
+	python3 - "$json_file" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+try:
+	with open(path, "r", encoding="utf-8") as handle:
+		payload = json.load(handle)
+	data = payload.get("Data", {})
+	mn = float(data.get("minFps"))
+	avg = float(data.get("averageFps"))
+	mx = float(data.get("maxFps"))
+	print(f"{mn:.2f}|{avg:.2f}|{mx:.2f}")
+except Exception:
+	print("||")
+PY
+}
+
+extract_fps_triplet_from_txt() {
+	local txt_file="$1"
+	local benchmark_text_stream=""
+
+	if command -v strings >/dev/null 2>&1; then
+		benchmark_text_stream="$(strings -a "$txt_file")"
+	else
+		benchmark_text_stream="$(tr -cd '\11\12\15\40-\176' < "$txt_file")"
+	fi
+
+	local min_fps max_fps avg_fps
+	min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Min FPS:/{print $3; exit}')"
+	max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Max FPS:/{print $3; exit}')"
+	avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average Benchmark Statistics/{in_average=1; next} in_average && /Average FPS:/{print $3; exit}')"
+
+	if [[ -z "$min_fps" || -z "$max_fps" || -z "$avg_fps" ]]; then
+		min_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Min FPS:/{print $3; exit}')"
+		max_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Max FPS:/{print $3; exit}')"
+		avg_fps="$(printf '%s\n' "$benchmark_text_stream" | awk '/Average FPS:/{print $3; exit}')"
+	fi
+
+	if [[ -n "$min_fps" && -n "$avg_fps" && -n "$max_fps" ]]; then
+		printf '%s|%s|%s\n' "$min_fps" "$avg_fps" "$max_fps"
+	else
+		echo "||"
+	fi
+}
+
+extract_timestamp_from_native_txt_name() {
+	local file_name="$1"
+	if [[ "$file_name" =~ _([0-9]{4})-([0-9]{2})-([0-9]{2})_([0-9]{2})\.([0-9]{2})\.([0-9]{2})\.txt$ ]]; then
+		echo "${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}_${BASH_REMATCH[4]}${BASH_REMATCH[5]}${BASH_REMATCH[6]}"
+	else
+		echo ""
+	fi
+}
+
+join_unique_values() {
+	if [[ $# -eq 0 ]]; then
+		echo "N/A"
+		return
+	fi
+
+	printf '%s\n' "$@" \
+		| awk 'NF' \
+		| sort -u \
+		| awk 'BEGIN { first = 1 } { if (!first) printf ", "; printf "%s", $0; first = 0 } END { if (NR == 0) printf "N/A"; printf "\n" }'
+}
+
+collect_selected_gpu_metadata() {
+	local -A selected_tests_lookup=()
+	local -A gpu_models=()
+	local -A gpu_vrams=()
+	local -A gpu_drivers=()
+	local key key_test gpu_model gpu_vram gpu_driver
+
+	for test_name in "${SELECTED_TESTS[@]}"; do
+		selected_tests_lookup["$test_name"]=1
+	done
+
+	for key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+		if [[ -z "${selected_tests_lookup[${key%%|*}]+isset}" ]]; then
+			continue
+		fi
+
+		if [[ -z "${LATEST_MIN_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_AVG_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_MAX_FPS_BY_KEY[$key]+isset}" ]]; then
+			continue
+		fi
+
+		IFS='|' read -r key_test gpu_model gpu_vram gpu_driver <<<"$key"
+		gpu_models["$gpu_model"]=1
+		gpu_vrams["$gpu_vram"]=1
+		gpu_drivers["$gpu_driver"]=1
+	done
+
+	REPORT_GPU_MODELS="$(join_unique_values "${!gpu_models[@]}")"
+	REPORT_GPU_VRAMS="$(join_unique_values "${!gpu_vrams[@]}")"
+	REPORT_GPU_DRIVERS="$(join_unique_values "${!gpu_drivers[@]}")"
+}
+
+write_report_header() {
+	local output_file="$1"
+	local title="$2"
+	local mode_label="$3"
+	local gpu_models="$4"
+	local gpu_vrams="$5"
+	local gpu_drivers="$6"
+
+	{
+		echo "# ${title}"
+		echo
+		echo "- Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+		echo "- JSON archive directory: ${RESULTS_DIR}"
+		echo "- Benchmark source directory: ${BENCHMARK_RESULTS_SOURCE_DIR}"
+		echo "- Mode: ${mode_label}"
+		echo "- OS: ${REPORT_SYSTEM_OS}"
+		echo "- KERNEL: ${REPORT_SYSTEM_KERNEL}"
+		echo "- CPU: ${REPORT_SYSTEM_CPU}"
+		echo "- RAM: ${REPORT_SYSTEM_RAM}"
+		echo "- GPU: ${REPORT_SYSTEM_GPU}"
+		echo "- GPU DRIVER: ${REPORT_SYSTEM_GPU_DRIVER}"
+		echo "- GPU VRAM: ${gpu_vrams}"
+		echo "- Proton: ${REPORT_SYSTEM_PROTON}"
+		echo
+		echo "| Test Name | Mode | Resolution | Quality | Ray Tracing | Frame Generation | GPU Model | GPU VRAM | Driver | Min FPS | Avg FPS | Max FPS |"
+		echo "|---|---|---|---|---|---|---|---|---|---:|---:|---:|"
+	} > "$output_file"
+}
+
+append_template_rows() {
+	local output_file="$1"
+	local tests_written=0
+
+	for test_name in "${SELECTED_TESTS[@]}"; do
+		read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$test_name]}"
+		echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} |  |  |  |  |  |  |" >> "$output_file"
+		tests_written=$((tests_written + 1))
+	done
+
+	echo "$tests_written"
+}
+
+append_latest_rows() {
+	local output_file="$1"
+	local rows_written=0
+	local key test_name mode resolution quality ray_tracing frame_generation
+	local key_test gpu_model gpu_vram gpu_driver
+
+	mapfile -t sorted_keys < <(printf '%s\n' "${!LATEST_RESULT_FILE_BY_KEY[@]}" | sort)
+
+	for test_name in "${SELECTED_TESTS[@]}"; do
+		read -r mode resolution quality ray_tracing frame_generation <<<"${TESTS[$test_name]}"
+
+		for key in "${sorted_keys[@]}"; do
+			IFS='|' read -r key_test gpu_model gpu_vram gpu_driver <<<"$key"
+			if [[ "$key_test" != "$test_name" ]]; then
+				continue
+			fi
+
+			if [[ -z "${LATEST_MIN_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_AVG_FPS_BY_KEY[$key]+isset}" || -z "${LATEST_MAX_FPS_BY_KEY[$key]+isset}" ]]; then
+				continue
+			fi
+
+			echo "| ${test_name} | ${mode} | ${resolution} | ${quality} | ${ray_tracing} | ${frame_generation} | ${gpu_model} | ${gpu_vram} | ${gpu_driver} | ${LATEST_MIN_FPS_BY_KEY[$key]} | ${LATEST_AVG_FPS_BY_KEY[$key]} | ${LATEST_MAX_FPS_BY_KEY[$key]} |" >> "$output_file"
+			rows_written=$((rows_written + 1))
+		done
+	done
+
+	echo "$rows_written"
+}
+
+ensure_test_results_section_exists() {
+	if [[ ! -f "$GAME_README_FILE" ]]; then
+		log_warning "Game README file not found, skipping report link registration: $GAME_README_FILE"
+		return 1
+	fi
+
+	if grep -Fq "$TEST_RESULTS_START_MARKER" "$GAME_README_FILE" && grep -Fq "$TEST_RESULTS_END_MARKER" "$GAME_README_FILE"; then
+		return 0
+	fi
+
+	{
+		echo
+		echo "## Test Results"
+		echo
+		echo "Latest report files:"
+		echo
+		echo "- [benchmark/results/metro_exodus_benchmark_report_template.md](benchmark/results/metro_exodus_benchmark_report_template.md)"
+		echo "- [benchmark/results/metro_exodus_benchmark_report.md](benchmark/results/metro_exodus_benchmark_report.md)"
+		echo
+		echo "Historical snapshot reports (auto-updated by \\`benchmark/analyze_metro_exodus_results.sh\\`):"
+		echo
+		echo "$TEST_RESULTS_START_MARKER"
+		echo "$TEST_RESULTS_PLACEHOLDER"
+		echo "$TEST_RESULTS_END_MARKER"
+	} >> "$GAME_README_FILE"
+
+	log_info "Added missing Test Results section to: $GAME_README_FILE"
+	return 0
+}
+
+register_report_link_in_readme() {
+	local report_file="$1"
+
+	ensure_test_results_section_exists || return 0
+
+	local report_basename
+	report_basename="$(basename "$report_file")"
+	local relative_report_path="benchmark/results/${report_basename}"
+	local markdown_link="- [${report_basename}](${relative_report_path})"
+
+	if grep -Fq "$markdown_link" "$GAME_README_FILE"; then
+		log_info "Report link already registered in README: $report_basename"
+		return 0
+	fi
+
+	local temp_file
+	temp_file="$(mktemp)"
+
+	awk \
+		-v start_marker="$TEST_RESULTS_START_MARKER" \
+		-v end_marker="$TEST_RESULTS_END_MARKER" \
+		-v placeholder="$TEST_RESULTS_PLACEHOLDER" \
+		-v new_link="$markdown_link" \
+		'
+		$0 == start_marker {
+			print
+			print new_link
+			in_results_block = 1
+			next
+		}
+		$0 == end_marker {
+			in_results_block = 0
+		}
+		in_results_block && $0 == placeholder {
+			next
+		}
+		{
+			print
+		}
+		' "$GAME_README_FILE" > "$temp_file"
+
+	mv "$temp_file" "$GAME_README_FILE"
+	log_success "Registered report link in README: $report_basename"
+}
+
+register_all_snapshot_report_links_in_readme() {
+	ensure_test_results_section_exists || return 0
+
+	local -a snapshot_files
+	local -a sorted_snapshot_files
+	local -A seen_snapshot_basenames=()
+	shopt -s nullglob
+	snapshot_files=("${RESULTS_DIR}"/metro_exodus_benchmark_report_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].md)
+	shopt -u nullglob
+
+	local links_file
+	links_file="$(mktemp)"
+
+	if [[ ${#snapshot_files[@]} -eq 0 ]]; then
+		echo "$TEST_RESULTS_PLACEHOLDER" > "$links_file"
+	else
+		mapfile -t sorted_snapshot_files < <(printf '%s\n' "${snapshot_files[@]}" | sort -r)
+
+		local snapshot_file snapshot_basename relative_report_path
+		for snapshot_file in "${sorted_snapshot_files[@]}"; do
+			snapshot_basename="$(basename "$snapshot_file")"
+			if [[ -n "${seen_snapshot_basenames[$snapshot_basename]+isset}" ]]; then
+				continue
+			fi
+
+			relative_report_path="benchmark/results/${snapshot_basename}"
+			echo "- [${snapshot_basename}](${relative_report_path})" >> "$links_file"
+			seen_snapshot_basenames["$snapshot_basename"]=1
+		done
+
+		if [[ ! -s "$links_file" ]]; then
+			echo "$TEST_RESULTS_PLACEHOLDER" > "$links_file"
+		fi
+	fi
+
+	local temp_file
+	temp_file="$(mktemp)"
+
+	awk \
+		-v start_marker="$TEST_RESULTS_START_MARKER" \
+		-v end_marker="$TEST_RESULTS_END_MARKER" \
+		-v links_file="$links_file" \
+		'
+		$0 == start_marker {
+			print
+			while ((getline link_line < links_file) > 0) {
+				print link_line
+			}
+			close(links_file)
+			in_results_block = 1
+			next
+		}
+		$0 == end_marker {
+			in_results_block = 0
+			print
+			next
+		}
+		in_results_block {
+			next
+		}
+		{
+			print
+		}
+		' "$GAME_README_FILE" > "$temp_file"
+
+	rm -f "$links_file"
+	mv "$temp_file" "$GAME_README_FILE"
+	log_success "Synchronized snapshot report links in README (newest first, no duplicates)."
+}
+
+augment_tests_with_fg_variants
+parse_arguments "$@"
+select_tests_for_report
+
+declare -A LATEST_RESULT_FILE_BY_KEY
+declare -A LATEST_TIMESTAMP_BY_KEY
+declare -A LATEST_MIN_FPS_BY_KEY
+declare -A LATEST_AVG_FPS_BY_KEY
+declare -A LATEST_MAX_FPS_BY_KEY
+
+shopt -s nullglob
+result_files=("${RESULTS_DIR}"/*_result_*.json)
+shopt -u nullglob
+
+for result_file in "${result_files[@]}"; do
+	file_name="$(basename "$result_file")"
+	if [[ "$file_name" =~ ^[0-9]+_result_(.+)_([^_]+)_([^_]+)_([^_]+)_([0-9]{8}_[0-9]{6})\.json$ ]]; then
+		test_name="${BASH_REMATCH[1]}"
+		gpu_model="${BASH_REMATCH[2]}"
+		gpu_vram="${BASH_REMATCH[3]}"
+		gpu_driver="${BASH_REMATCH[4]}"
+		result_timestamp="${BASH_REMATCH[5]}"
+		result_key="${test_name}|${gpu_model}|${gpu_vram}|${gpu_driver}"
+
+		if [[ -z "${LATEST_TIMESTAMP_BY_KEY[$result_key]+isset}" || "$result_timestamp" > "${LATEST_TIMESTAMP_BY_KEY[$result_key]}" ]]; then
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$result_file"
+		fi
+	elif [[ "$file_name" =~ ^[0-9]+_result_(.+)_([0-9]{8}_[0-9]{6})\.json$ ]]; then
+		test_name="${BASH_REMATCH[1]}"
+		result_timestamp="${BASH_REMATCH[2]}"
+		result_key="${test_name}|unknown-gpu|unknown-vram|unknown-driver"
+
+		if [[ -z "${LATEST_TIMESTAMP_BY_KEY[$result_key]+isset}" || "$result_timestamp" > "${LATEST_TIMESTAMP_BY_KEY[$result_key]}" ]]; then
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$result_file"
+		fi
+	fi
+done
+
+if [[ -z "${LATEST_RESULT_FILE_BY_KEY[*]-}" ]]; then
+	mapfile -t sorted_native_summary_txt < <(
+		find "$RESULTS_DIR" -maxdepth 1 -type f \( -name 'Metro Exodus_benchmarkresults_*.txt' -o -name 'MetroExodus_benchmarkresults_*.txt' -o -name 'METROEXODUS_*.txt' \) ! -name '*frametimes*' ! -name '*feral_*' -printf '%T@ %p\n' 2>/dev/null | sort -n | cut -d' ' -f2-
+	)
+
+	if [[ ${#sorted_native_summary_txt[@]} -gt 0 ]]; then
+		if [[ ${#sorted_native_summary_txt[@]} -lt ${#SELECTED_TESTS[@]} ]]; then
+			log_warning "Native TXT fallback: only ${#sorted_native_summary_txt[@]} benchmark summary files for ${#SELECTED_TESTS[@]} selected tests."
+		fi
+
+		start_index=0
+		if [[ ${#sorted_native_summary_txt[@]} -gt ${#SELECTED_TESTS[@]} ]]; then
+			start_index=$(( ${#sorted_native_summary_txt[@]} - ${#SELECTED_TESTS[@]} ))
+		fi
+
+		for idx in "${!SELECTED_TESTS[@]}"; do
+			source_idx=$((start_index + idx))
+			if [[ $source_idx -ge ${#sorted_native_summary_txt[@]} ]]; then
+				break
+			fi
+
+			test_name="${SELECTED_TESTS[$idx]}"
+			txt_file="${sorted_native_summary_txt[$source_idx]}"
+			fps_triplet="$(extract_fps_triplet_from_txt "$txt_file")"
+			IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
+
+			if [[ -z "$min_fps" || -z "$avg_fps" || -z "$max_fps" ]]; then
+				continue
+			fi
+
+			result_timestamp="$(extract_timestamp_from_native_txt_name "$(basename "$txt_file")")"
+			if [[ -z "$result_timestamp" ]]; then
+				result_timestamp="19700101_000000"
+			fi
+
+			result_key="${test_name}|unknown-gpu|unknown-vram|unknown-driver"
+			LATEST_TIMESTAMP_BY_KEY["$result_key"]="$result_timestamp"
+			LATEST_RESULT_FILE_BY_KEY["$result_key"]="$txt_file"
+			LATEST_MIN_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$min_fps")"
+			LATEST_AVG_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$avg_fps")"
+			LATEST_MAX_FPS_BY_KEY["$result_key"]="$(printf '%.2f' "$max_fps")"
+		done
+
+		mapped_count=0
+		for _result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+			mapped_count=$((mapped_count + 1))
+		done
+		log_info "Native TXT fallback applied: mapped ${mapped_count} benchmark summary files to selected tests."
+	fi
+fi
+
+for result_key in "${!LATEST_RESULT_FILE_BY_KEY[@]}"; do
+	if [[ -n "${LATEST_MIN_FPS_BY_KEY[$result_key]+isset}" && -n "${LATEST_AVG_FPS_BY_KEY[$result_key]+isset}" && -n "${LATEST_MAX_FPS_BY_KEY[$result_key]+isset}" ]]; then
+		continue
+	fi
+
+	fps_triplet="$(extract_fps_triplet "${LATEST_RESULT_FILE_BY_KEY[$result_key]}")"
+	IFS='|' read -r min_fps avg_fps max_fps <<<"$fps_triplet"
+
+	if [[ -n "$min_fps" && -n "$avg_fps" && -n "$max_fps" ]]; then
+		LATEST_MIN_FPS_BY_KEY["$result_key"]="$min_fps"
+		LATEST_AVG_FPS_BY_KEY["$result_key"]="$avg_fps"
+		LATEST_MAX_FPS_BY_KEY["$result_key"]="$max_fps"
+	fi
+done
+
+REPORT_GPU_MODELS="N/A"
+REPORT_GPU_VRAMS="N/A"
+REPORT_GPU_DRIVERS="N/A"
+collect_selected_gpu_metadata
+
+write_report_header "$TEMPLATE_FILE" "Metro Exodus Benchmark Report Template" "Template (blank FPS cells)" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+total_tests="$(append_template_rows "$TEMPLATE_FILE")"
+
+write_report_header "$LATEST_REPORT_FILE" "Metro Exodus Benchmark Report" "Latest result per test from JSON files" "$REPORT_GPU_MODELS" "$REPORT_GPU_VRAMS" "$REPORT_GPU_DRIVERS"
+filled_rows="$(append_latest_rows "$LATEST_REPORT_FILE")"
+cp "$LATEST_REPORT_FILE" "$TIMESTAMPED_REPORT_FILE"
+register_all_snapshot_report_links_in_readme
+
+filled_tests=0
+for test_name in "${SELECTED_TESTS[@]}"; do
+	if grep -q "^| ${test_name} |" "$LATEST_REPORT_FILE"; then
+		filled_tests=$((filled_tests + 1))
+	fi
+done
+
+log_success "Generated template: $TEMPLATE_FILE"
+log_success "Generated report:   $LATEST_REPORT_FILE"
+log_success "Snapshot report:    $TIMESTAMPED_REPORT_FILE"
+log_info "Total test rows:    $total_tests"
+log_info "Rows with FPS data: $filled_tests"
+log_info "Rows in report:     $filled_rows"
+log_info "Selected tests:     ${#SELECTED_TESTS[@]}"
