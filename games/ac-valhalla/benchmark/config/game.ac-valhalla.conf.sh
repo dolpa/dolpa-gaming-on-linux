@@ -55,7 +55,7 @@ RUN_ENVIRONMENT_VARIABLES=(
 # $SHORT_GAME_NAME - this variable is available in this function and contains a short version of the game name that can be used in file names (e.g. "ac-valhalla" for "Assassin’s Creed Valhalla")
 # $script_run_timestamp - this variable is available in this function and contains the timestamp of when the benchmark script was run, which can be used in file names to ensure uniqueness (e.g. "2024-06-01_12-00-00")
 # $GAME_NAME - this variable is available in this function and contains the full game name (e.g. "Assassin’s Creed Valhalla") that can be used for logging or other purposes
-function custom_extract_benchmark_results_from_screenshots_ac_valhalla() {
+custom_extract_benchmark_results_from_screenshots_ac_valhalla() {
     log_info "TODO: implement this function to extract benchmark results from screenshots for ${GAME_NAME}; you can adapt it to how the benchmark results are displayed in the screenshots and what specific information you want to extract (e.g. average FPS, frametimes, …)"
     # try each screenshot taken during the benchmark run and extract the relevant information using OCR or other methods; you can use tools like tesseract‑ocr for OCR, or if the game provides an API or a way to export the results in a structured format, you can use that instead
     for i in $(seq 1 "$_NUMBER_OF_SCREENSHOTS"); do
