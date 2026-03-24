@@ -204,7 +204,7 @@ Latest report files:
 Historical snapshot reports (auto-updated by `benchmark/analyze_sottr_results.sh`):
 
 <!-- TEST_RESULTS_START -->
-- [sottr_benchmark_report_20260324_085053.md](enchmark/results/sottr_benchmark_report_20260324_085053.md) - for RTX 5060 8GB (all resolutions) with proton mode
+- [sottr_benchmark_report_20260324_085053.md](benchmark/results/sottr_benchmark_report_20260324_085053.md) - for RTX 5070 Ti (all resolutions) with proton mode
 
 - [sottr_benchmark_report_20260303_072138.md](benchmark/results/sottr_benchmark_report_20260303_072138.md) - for RTX 5060 8GB (all resolutions) with proton mode
 - [sottr_benchmark_report_20260302_205207.md](benchmark/results/sottr_benchmark_report_20260302_205207.md) - for RTX 5060 8GB (all resolutions) with native mode
