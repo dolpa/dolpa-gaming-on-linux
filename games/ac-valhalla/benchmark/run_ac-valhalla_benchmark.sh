@@ -886,6 +886,8 @@ run_test() {
         log_to_file error "$logfile" "$test_name failed"
         return 1
     fi
+    # need to add the result extraction from screenshots here after the benchmark run is completed; you can also implement it as a separate function and call it here, passing the necessary parameters (e.g. test name, log file, etc.)
+
 }
 
 # Function to launch with a specific upscaling mode
@@ -1125,9 +1127,28 @@ run_bench() {
         fi
     fi
     
+    sleep 15   # give the game time to close cleanly
+    return $exit_code
+}
 
-    # Analize the images and extract the benchmark results
-    if [[ $exit_code -eq 0 && ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
+
+# --------------------------------------------------------------------
+#  Post-run processing: extract results from screenshots and copy the
+#  result file to the output directory.
+#  Only called on successful benchmark runs.
+# Arguments:
+#   $1 – test name
+#   $2 – log file path
+# --------------------------------------------------------------------
+process_benchmark_results() {
+    local test_name
+    local logfile
+
+    test_name="$1"
+    logfile="$2"
+
+    # Analyse the images and extract the benchmark results
+    if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
         # If the benchmark completed successfully, it's time to extract the results from the screenshots; you can implement the extraction logic in the extract_benchmark_results_from_screenshots_to_results function, or if you have a custom function for this specific game, you can call it here (just make sure to define it in the game config file or the global benchmark config file)
         if declare -F "$CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION" > /dev/null; then
             log_to_file info "$logfile" "Extracting benchmark results from screenshots using custom function: $CUSTOM_EXTRACT_BENCHMARK_RESULTS_FROM_SCREENSHOTS_FUNCTION"
@@ -1139,17 +1160,264 @@ run_bench() {
     fi
 
     # Copy the benchmark result file (e.g. CSV) to the results folder with a name that includes the test name, mode, resolution, and GPU metadata; you will need to adapt the source file name and the naming format to your specific game and benchmark output
-    if [[ NEED_TO_TAKE_SCREENSHOT_OF_RESULTS -eq 0 ]]; then
-        # If we took screenshots of the benchmark results, we assume that the extracted results are saved in a structured format (e.g. CSV) in the results folder, and we copy that file; you can adapt this to your specific extraction logic and output format
+    local ocr_min_fps="" ocr_avg_fps="" ocr_max_fps=""
+    if [[ ${NEED_TO_TAKE_SCREENSHOT_OF_RESULTS} ]]; then
+        # If the benchmark results were extracted from screenshots via OCR, try to read the FPS values from
+        # the output text files written by the extraction function.
+        # The extraction function writes one .txt file per screenshot; adapt the file naming and field
+        # mapping below to match your specific game's benchmark results screen layout.
+        #
+        # Convention assumed here:
+        #   screenshot 1 → avg FPS
+        #   screenshot 2 → min FPS  (if _NUMBER_OF_SCREENSHOTS >= 2)
+        #   screenshot 3 → max FPS  (if _NUMBER_OF_SCREENSHOTS >= 3)
+        # Adjust as needed once the OCR extraction is implemented for your game.
+        local _ocr_file_base
+        _ocr_file_base="${BENCHMARK_RESULTS_OUTPUT_DIR}/result_${SHORT_GAME_NAME}_${test_name}_${SCRIPT_RUN_TIMESTAMP}"
+
+        [[ -f "${_ocr_file_base}_1.txt" ]] && ocr_avg_fps="$(tr -d '[:space:]' < "${_ocr_file_base}_1.txt" 2>/dev/null)"
+        [[ -f "${_ocr_file_base}_2.txt" ]] && ocr_min_fps="$(tr -d '[:space:]' < "${_ocr_file_base}_2.txt" 2>/dev/null)"
+        [[ -f "${_ocr_file_base}_3.txt" ]] && ocr_max_fps="$(tr -d '[:space:]' < "${_ocr_file_base}_3.txt" 2>/dev/null)"
+
+        log_to_file info "$logfile" "OCR-extracted FPS for '$test_name': min=${ocr_min_fps:-N/A} avg=${ocr_avg_fps:-N/A} max=${ocr_max_fps:-N/A}"
+    else
+        # Not screenshot mode – copy the structured result file (JSON/CSV) produced by the game
         if [[ -n "$test_name" ]]; then
             copy_benchmark_result_file "$test_name" "$logfile"
         else
             copy_benchmark_result_file "manual-${mode}-${res}" "$logfile"
         fi
     fi
-    
-    sleep 15   # give the game time to close cleanly
-    return $exit_code
+
+    # Append the result row to the per-system results report.
+    # Pass OCR FPS values as optional args; they are empty strings when not in screenshot mode,
+    # which causes append_result_to_report to fall back to file-based discovery.
+    append_result_to_report "$test_name" "$logfile" "$ocr_min_fps" "$ocr_avg_fps" "$ocr_max_fps"
+}
+
+
+# --------------------------------------------------------------------
+#  Append a result row to the per-system results markdown report.
+#  Creates the report from the template if it does not yet exist.
+#  Only called on successful benchmark runs.
+# Arguments:
+#   $1 – test name
+#   $2 – log file path
+#   $3 – (optional) pre-computed min FPS  – supplied when results come from OCR/screenshots
+#   $4 – (optional) pre-computed avg FPS  – supplied when results come from OCR/screenshots
+#   $5 – (optional) pre-computed max FPS  – supplied when results come from OCR/screenshots
+#        When $3-$5 are empty the function discovers the result file from BENCHMARK_RESULTS_OUTPUT_DIR.
+# --------------------------------------------------------------------
+append_result_to_report() {
+    local test_name
+    local logfile
+    local results_dir
+    local template_file
+    local report_file
+
+    test_name="$1"
+    logfile="$2"
+    local pre_min_fps="${3:-}"
+    local pre_avg_fps="${4:-}"
+    local pre_max_fps="${5:-}"
+    results_dir="${SCRIPT_DIR}/results"
+    template_file="${results_dir}/ac-valhalla_results_template.md"
+    report_file="${results_dir}/ac-valhalla_${SYSTEM_NAME}_results.md"
+
+    # ----------------------------------------------------------------
+    #  Create the report from the template if it does not exist yet
+    # ----------------------------------------------------------------
+    if [[ ! -f "$report_file" ]]; then
+        if [[ ! -f "$template_file" ]]; then
+            log_to_file error "$logfile" "Results template not found: $template_file"
+            return 1
+        fi
+
+        log_to_file info "$logfile" "Creating results report from template: $report_file"
+
+        # Collect static system info for the header placeholders
+        local os_info kernel_info cpu_info ram_total
+        local hdr_gpu hdr_gpu_driver hdr_gpu_vram
+
+        os_info="$(lsb_release -d 2>/dev/null | cut -f2- | str_trim)"
+        [[ -z "$os_info" ]] && os_info="$(grep -m1 PRETTY_NAME /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '"')"
+        kernel_info="$(uname -r)"
+        cpu_info="$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | str_trim)"
+        ram_total="$(awk '/MemTotal/ { printf "%.0f GB", $2/1024/1024 }' /proc/meminfo 2>/dev/null)"
+
+        if command_exists nvidia-smi; then
+            local nv_line
+            nv_line="$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits 2>/dev/null | head -n1)"
+            IFS=',' read -r hdr_gpu hdr_gpu_vram hdr_gpu_driver <<< "$nv_line"
+            hdr_gpu="$(str_trim "$hdr_gpu")"
+            hdr_gpu_vram="$(str_trim "$hdr_gpu_vram")mb"
+            hdr_gpu_driver="$(str_trim "$hdr_gpu_driver")"
+        else
+            hdr_gpu="unknown";  hdr_gpu_vram="unknown";  hdr_gpu_driver="unknown"
+        fi
+
+        sed \
+            -e "s|{GENERATED}|$(date '+%Y-%m-%d %H:%M:%S %Z')|g" \
+            -e "s|{JSON_ARCHIVE_DIR}|${BENCHMARK_RESULTS_OUTPUT_DIR}|g" \
+            -e "s|{BENCHMARK_SOURCE_DIR}|${BENCHMARK_RESULTS_SOURCE_DIR}|g" \
+            -e "s|{MODE}|Latest result per test from JSON files|g" \
+            -e "s|{OS}|${os_info}|g" \
+            -e "s|{KERNEL}|${kernel_info}|g" \
+            -e "s|{CPU}|${cpu_info}|g" \
+            -e "s|{RAM}|${ram_total}|g" \
+            -e "s|{GPU}|${hdr_gpu}|g" \
+            -e "s|{GPU_DRIVER}|${hdr_gpu_driver}|g" \
+            -e "s|{GPU_VRAM}|${hdr_gpu_vram}|g" \
+            -e "s|{PROTON_VERSION}|${PROTON_VERSION}|g" \
+            -e "s|{SYSTEM_NAME}|${SYSTEM_NAME}|g" \
+            "$template_file" > "$report_file"
+
+        log_to_file success "$logfile" "Results report created: $report_file"
+    fi
+
+    # ----------------------------------------------------------------
+    #  Extract FPS metrics
+    #  Pre-computed values (from OCR/screenshot mode) take priority.
+    #  Otherwise discover the most recently written result file.
+    # ----------------------------------------------------------------
+    local min_fps avg_fps max_fps
+    min_fps="N/A";  avg_fps="N/A";  max_fps="N/A"
+
+    if [[ -n "$pre_min_fps" || -n "$pre_avg_fps" || -n "$pre_max_fps" ]]; then
+        # Values were passed in from screenshot/OCR extraction
+        [[ -n "$pre_min_fps" ]] && min_fps="$pre_min_fps"
+        [[ -n "$pre_avg_fps" ]] && avg_fps="$pre_avg_fps"
+        [[ -n "$pre_max_fps" ]] && max_fps="$pre_max_fps"
+        log_to_file info "$logfile" "Using pre-computed FPS for '$test_name': min=${min_fps} avg=${avg_fps} max=${max_fps}"
+    else
+        # File-based path: locate the most recent result file written by copy_benchmark_result_file
+        # (uses a glob so the exact timestamp and extension do not need to be known in advance)
+        local result_file
+        result_file="$(find "$BENCHMARK_RESULTS_OUTPUT_DIR" \
+            -maxdepth 1 \
+            -name "${GAME_ID}_result_${test_name}_${GPU_METADATA_TAG}_*" \
+            -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)"
+
+        if [[ -n "$result_file" && -f "$result_file" ]]; then
+            case "${result_file##*.}" in
+                json)
+                    min_fps="$(python3 -c "
+import json, sys
+d = json.load(open('$result_file'))
+print(d.get('minFPS', d.get('min_fps', d.get('MinFPS', 'N/A'))))
+" 2>/dev/null || echo 'N/A')"
+                    avg_fps="$(python3 -c "
+import json, sys
+d = json.load(open('$result_file'))
+print(d.get('avgFPS', d.get('avg_fps', d.get('averageFPS', d.get('AvgFPS', 'N/A')))))
+" 2>/dev/null || echo 'N/A')"
+                    max_fps="$(python3 -c "
+import json, sys
+d = json.load(open('$result_file'))
+print(d.get('maxFPS', d.get('max_fps', d.get('MaxFPS', 'N/A'))))
+" 2>/dev/null || echo 'N/A')"
+                    ;;
+                csv)
+                    # Expects column headers in the first row; matching is case-insensitive and trims whitespace
+                    min_fps="$(python3 -c "
+import csv
+with open('$result_file') as f:
+    row = next(csv.DictReader(f), None)
+keys = {k.lower().strip(): v for k, v in row.items()} if row else {}
+print(keys.get('minfps', keys.get('min fps', keys.get('min_fps', 'N/A'))))
+" 2>/dev/null || echo 'N/A')"
+                    avg_fps="$(python3 -c "
+import csv
+with open('$result_file') as f:
+    row = next(csv.DictReader(f), None)
+keys = {k.lower().strip(): v for k, v in row.items()} if row else {}
+print(keys.get('avgfps', keys.get('avg fps', keys.get('avg_fps', keys.get('averagefps', 'N/A')))))
+" 2>/dev/null || echo 'N/A')"
+                    max_fps="$(python3 -c "
+import csv
+with open('$result_file') as f:
+    row = next(csv.DictReader(f), None)
+keys = {k.lower().strip(): v for k, v in row.items()} if row else {}
+print(keys.get('maxfps', keys.get('max fps', keys.get('max_fps', 'N/A'))))
+" 2>/dev/null || echo 'N/A')"
+                    ;;
+                *)
+                    log_to_file warning "$logfile" "Unsupported result file format for '$test_name': $result_file – FPS values will be N/A"
+                    ;;
+            esac
+        else
+            log_to_file warning "$logfile" "No result file found for '$test_name' (pattern: ${GAME_ID}_result_${test_name}_${GPU_METADATA_TAG}_*) – FPS values will be N/A"
+        fi
+    fi
+
+    # ----------------------------------------------------------------
+    #  Collect live system metrics
+    #  NOTE: these are sampled at reporting time, not during the run.
+    #  For in-run metrics integrate MangoHud or a background sampler.
+    # ----------------------------------------------------------------
+    local gpu_load vram_used cpu_load ram_used
+    gpu_load="N/A";  vram_used="N/A";  cpu_load="N/A";  ram_used="N/A"
+
+    if command_exists nvidia-smi; then
+        local nv_metrics gpu_load_raw vram_used_raw
+        nv_metrics="$(nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader,nounits 2>/dev/null | head -n1)"
+        IFS=',' read -r gpu_load_raw vram_used_raw <<< "$nv_metrics"
+        gpu_load="$(str_trim "$gpu_load_raw")%"
+        vram_used="$(str_trim "$vram_used_raw")mb"
+    fi
+
+    if [[ -f /proc/stat ]]; then
+        # Idle% from top single sample; accuracy is limited – two-sample /proc/stat diff is more precise
+        local idle_pct
+        idle_pct="$(TERM=dumb top -bn1 2>/dev/null | awk '/Cpu\(s\)|%Cpu/ {for(i=1;i<=NF;i++) if($i ~ /id,?$/ || $(i+1) ~ /id,?$/) {gsub(/,/,"",$i); print $i; exit}}')"
+        if [[ -n "$idle_pct" ]]; then
+            cpu_load="$(awk -v idle="$idle_pct" 'BEGIN { printf "%.1f%%", 100 - idle }')"
+        fi
+    fi
+
+    if [[ -f /proc/meminfo ]]; then
+        local ram_total_mb ram_free_mb ram_used_mb ram_total_gb ram_pct
+        ram_total_mb="$(awk '/MemTotal/    { printf "%.0f", $2/1024 }' /proc/meminfo)"
+        ram_free_mb="$(awk  '/MemAvailable/ { printf "%.0f", $2/1024 }' /proc/meminfo)"
+        ram_used_mb=$(( ram_total_mb - ram_free_mb ))
+        ram_total_gb=$(( ram_total_mb / 1024 ))
+        ram_pct=$(( ram_used_mb * 100 / ram_total_mb ))
+        ram_used="${ram_used_mb}mb/${ram_total_gb}gb (${ram_pct}%)"
+    fi
+
+    # ----------------------------------------------------------------
+    #  Determine run number (count of existing rows for this test + 1)
+    # ----------------------------------------------------------------
+    local run_number
+    run_number=$(( $(grep -cF "| ${test_name} |" "$report_file" 2>/dev/null) + 1 ))
+
+    # ----------------------------------------------------------------
+    #  Extract test parameters from the TESTS array
+    # ----------------------------------------------------------------
+    local params rs rs_type rs_preset resolution quality rt rt_preset fg
+    # shellcheck disable=SC2206
+    params=(${TESTS["$test_name"]})
+    rs="${params[1]}"
+    rs_type="${params[2]}"
+    rs_preset="${params[3]}"
+    resolution="${params[4]}"
+    quality="${params[5]}"
+    rt="${params[6]}"
+    rt_preset="${params[7]}"
+    fg="${params[8]}"
+
+    # ----------------------------------------------------------------
+    #  Append the new row to the table
+    # ----------------------------------------------------------------
+    local timestamp
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+
+    local new_row
+    new_row="| ${timestamp} | ${run_number} | ${test_name} | ${rs} | ${rs_type} | ${rs_preset} | ${resolution} | ${quality} | ${rt} | ${rt_preset} | ${fg} | ${min_fps} | ${avg_fps} | ${max_fps} | ${gpu_load} | ${vram_used} | ${cpu_load} | ${ram_used} |"
+
+    echo "$new_row" >> "$report_file"
+    log_to_file success "$logfile" "Appended run #${run_number} for '${test_name}' to ${report_file}"
+    return 0
 }
 
 
@@ -1539,6 +1807,10 @@ main() {
         log_to_file info "$logfile" "======================================="
         if run_test "$test_name" "$logfile" "$current_test_index" "$total_tests_count"; then
             successful_tests+=("$test_name")
+            # Analyse the images and extract the benchmark results, then copy the result file
+            process_benchmark_results "$test_name" "$logfile"
+            # Write down the results into results file
+
         else
             failed_tests+=("$test_name")
         fi
